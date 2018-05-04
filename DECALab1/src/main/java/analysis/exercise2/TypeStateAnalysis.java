@@ -15,12 +15,18 @@ import java.util.Set;
 
 public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
 
+    private boolean vulnerabilityFound = false;
+
+    private HashMap<FileStateFact, Set<Value>> factsToAliases = new HashMap<FileStateFact, Set<Value>>();
+
     public TypeStateAnalysis(Body body, VulnerabilityReporter reporter) {
         super(body, reporter);
     }
     HashMap<String, FileState> registerToStateMap = new HashMap<String, FileState>();
     @Override
     protected void flowThrough(Set<FileStateFact> in, Unit unit, Set<FileStateFact> out) {
+
+        System.out.println("flowthrough begin");
 
         // TODO: Implement your flow function here.
         String targetRegister = null;
@@ -33,24 +39,24 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
             System.out.println("box value type: " + box.getValue().getType());
             String boxValueType = box.getValue().getType().toString();
 
-            if(targetRegister != null){
+            if (targetRegister != null) {
                 String boxValue = box.getValue().toString();
-                if(boxValue.equals("new " + targetType)){
+                if (boxValue.equals("new " + targetType)) {
                     //add new FileStateFact to set
                     System.out.println("found new call. adding: " + targetRegister);
                     FileStateFact newFact = new FileStateFact(new HashSet<Value>(), FileState.Init);
+                    factsToAliases.put(newFact, new HashSet<Value>());
                     System.out.println("Value to add to new fact: " + boxValueStore.toString());
                     newFact.addAlias(boxValueStore);
                     in.add(newFact);
                     registerToStateMap.put(targetRegister, FileState.Init);
                     newStatement = true;
-                }
-                else{
+                } else {
                     String methodCallInit = "specialinvoke " + targetRegister + ".<" + targetType + ": void <init>()>()";
                     String methodCallOpen = "virtualinvoke " + targetRegister + ".<" + targetType + ": void open()>()";
                     String methodCallClose = "virtualinvoke " + targetRegister + ".<" + targetType + ": void close()>()";
-                    
-                    if(boxValue.equals(methodCallInit)){
+
+                    if (boxValue.equals(methodCallInit)) {
                         System.out.println("found init call");
                         if(registerToStateMap.containsKey(targetRegister)){
                             System.out.println("found map entry for " + targetRegister);
@@ -64,7 +70,7 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
                             //set alias
                         }
                     }
-                    if(boxValue.equals(methodCallOpen)){
+                    if (boxValue.equals(methodCallOpen)) {
                         System.out.println("found open call");
                         if(registerToStateMap.containsKey(targetRegister)){
                             System.out.println("found map entry for open: " + targetRegister);
@@ -89,10 +95,10 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
                         System.out.println("found close call");
                     }
 
-                    
+
                 }
             }
-            if(boxValueType.endsWith(".File")){
+            if (boxValueType.endsWith(".File")) {
                 targetRegister = box.getValue().toString();
                 targetType = boxValueType;
                 boxValueStore = box.getValue();
@@ -108,6 +114,13 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
             System.out.println("found return");
         }
 
+  
+
+        System.out.println("flowthrough end");
+
+        if (vulnerabilityFound) {
+            reporter.reportVulnerability(this.method.getSignature(), unit);
+        }
         copy(in, out);
     }
 
@@ -122,21 +135,32 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
     @Override
     protected void copy(Set<FileStateFact> source, Set<FileStateFact> dest) {
         for (FileStateFact fact : source) {
-            dest.add(fact.copy());
+            FileStateFact copyState = fact.copy();
+            factsToAliases.put(copyState, factsToAliases.get(fact));
+            dest.add(copyState);
         }
     }
 
     @Override
     protected void merge(Set<FileStateFact> in1, Set<FileStateFact> in2, Set<FileStateFact> out) {
         // TODO: Implement the merge function here.
-    
+        System.out.println("merge begin");
+        vulnerabilityFound = false;
+
+        Set<FileStateFact> fileStateFactsWithPartners1 = new HashSet<>();
+        Set<FileStateFact> fileStateFactsWithPartners2 = new HashSet<>();
+
         for (FileStateFact stateFact1 : in1) {
             for (FileStateFact stateFact2 : in2) {
-                if (commonAlias(stateFact1.getAliases(), stateFact2.getAliases())) {
+                if (commonAlias(factsToAliases.get(stateFact1), factsToAliases.get(stateFact2))) {
+
+                    fileStateFactsWithPartners1.add(stateFact1);
+                    fileStateFactsWithPartners2.add(stateFact2);
+
                     // merge
                     Set<Value> union = new HashSet<>();
-                    stateFact1.getAliases().forEach(s -> union.add(s));
-                    stateFact2.getAliases().forEach(s -> union.add(s));
+                    factsToAliases.get(stateFact1).forEach(s -> union.add(s));
+                    factsToAliases.get(stateFact2).forEach(s -> union.add(s));
 
                     FileState newState = null;
 
@@ -149,19 +173,29 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
                             (stateFact2.getState().equals(FileState.Init) && stateFact1.getState().equals(FileState.Open))) {
                         newState = FileState.Open;
                     } else {
-						//reporter.reportVulnerability(this.method, ????);
+                        vulnerabilityFound = true;
                     }
 
                     FileStateFact mergedStateFact = new FileStateFact(union, newState);
                     out.add(mergedStateFact);
                 }
 
-
             }
         }
-   // }
 
-}
+        // add those fact which were not merged
+        for (FileStateFact st : in1) {
+            if (!fileStateFactsWithPartners1.contains(st)) {
+                out.add(st);
+            }
+        }
+        for (FileStateFact st : in2) {
+            if (!fileStateFactsWithPartners2.contains(st)) {
+                out.add(st);
+            }
+        }
+
+    }
 
     private boolean commonAlias(Set<Value> s1, Set<Value> s2) {
         for (Value v1 : s1) {
