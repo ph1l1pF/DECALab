@@ -20,7 +20,6 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
     private boolean vulnerabilityFound = false;
 
     private Map<FileStateFact, Set<Value>> factsToAliases = new HashMap<>();
-    private Map<FileStateFact, FileState> factsToStates = new HashMap<>();
 
     public TypeStateAnalysis(Body body, VulnerabilityReporter reporter) {
         super(body, reporter);
@@ -48,7 +47,6 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
                     //add new FileStateFact to set
                     System.out.println("found new call. adding: " + targetRegister);
                     FileStateFact newFact = new FileStateFact(new HashSet<Value>(), FileState.New);
-                    factsToStates.put(newFact, FileState.New);
                     factsToAliases.put(newFact, new HashSet<Value>());
                     System.out.println("Value to add to new fact: " + boxValueStore.toString());
                     newFact.addAlias(boxValueStore);
@@ -146,7 +144,6 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
         for (FileStateFact fact : source) {
             FileStateFact copyState = fact.copy();
             factsToAliases.put(copyState, factsToAliases.get(fact));
-            factsToStates.put(copyState, factsToStates.get(fact));
             dest.add(copyState);
         }
     }
