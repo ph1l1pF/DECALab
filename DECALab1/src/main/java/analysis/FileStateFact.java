@@ -88,9 +88,9 @@ public class FileStateFact{
 		return true;
 	}
 
-	public Set<Value> getAliases(){
-		return aliases;
-	}
+//	public Set<Value> getAliases(){
+//		return aliases;
+//	}
 
 	public FileStateFact copy()
 	{
