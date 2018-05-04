@@ -9,8 +9,8 @@ import soot.Unit;
 import soot.Value;
 import soot.ValueBox;
 
-
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Set;
 
 public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
@@ -18,16 +18,16 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
     public TypeStateAnalysis(Body body, VulnerabilityReporter reporter) {
         super(body, reporter);
     }
-
+    HashMap<String, FileState> registerToStateMap = new HashMap<String, FileState>();
     @Override
     protected void flowThrough(Set<FileStateFact> in, Unit unit, Set<FileStateFact> out) {
-        copy(in, out);
 
         // TODO: Implement your flow function here.
         String targetRegister = null;
         String targetType = null;
         boolean newStatement = false;
         Value boxValueStore = null;
+
         for(ValueBox box : unit.getUseAndDefBoxes()){
             System.out.println("box value: " + box.getValue());
             System.out.println("box value type: " + box.getValue().getType());
@@ -38,9 +38,11 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
                 if(boxValue.equals("new " + targetType)){
                     //add new FileStateFact to set
                     System.out.println("found new call. adding: " + targetRegister);
-                    FileStateFact newFact = new FileStateFact(new HashSet<Value>(), FileState.New);
+                    FileStateFact newFact = new FileStateFact(new HashSet<Value>(), FileState.Init);
                     System.out.println("Value to add to new fact: " + boxValueStore.toString());
                     newFact.addAlias(boxValueStore);
+                    in.add(newFact);
+                    registerToStateMap.put(targetRegister, FileState.Init);
                     newStatement = true;
                 }
                 else{
@@ -50,7 +52,10 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
                     
                     if(boxValue.equals(methodCallInit)){
                         System.out.println("found init call");
-                        
+                        if(registerToStateMap.containsKey(targetRegister)){
+                            System.out.println("found map entry for " + targetRegister);
+
+                        }
                       
                     }
                     else{
@@ -61,8 +66,26 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
                     }
                     if(boxValue.equals(methodCallOpen)){
                         System.out.println("found open call");
+                        if(registerToStateMap.containsKey(targetRegister)){
+                            System.out.println("found map entry for open: " + targetRegister);
+                            if(registerToStateMap.get(targetRegister) == FileState.Init){
+                                System.out.println("open seems to be permittet");
+                            }
+                            else{
+                                this.reporter.reportVulnerability(this.method.getSignature(), unit);
+                            }
+                            
+                        }
                     }
                     if(boxValue.equals(methodCallClose)){
+                        if(registerToStateMap.containsKey(targetRegister)){
+                            System.out.println("found map entry for close: " + targetRegister);
+
+                        }
+                        else{
+                            System.out.println("close without init");
+                            this.reporter.reportVulnerability(this.method.getSignature(), unit);
+                        }
                         System.out.println("found close call");
                     }
 
@@ -80,42 +103,12 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
         boxValueStore = null;
         targetType = null;
         this.prettyPrint(in, unit, out);
-        // for(ValueBox defBox : unit.getDefBoxes()){
-        //     String defBoxValueType = defBox.getValue().getType().toString();
-        //     System.out.println("defbox value: " + defBox.getValue());
-        //     System.out.println("defbox value type: " + defBoxValueType);
-        //     // if(defBoxValueType.endsWith(".File")){
-        //     //     System.out.println("found file operation!");
-        //     //     System.out.println("def box value: " + defBox.getValue());
-        //     //     if(in.isEmpty()){
 
-        //     //         String useBoxValueString = unit.getUseBoxes().get(0).getValue().toString();
-        //     //         String expectedStringInit = "specialinvoke " +  defBox.getValue() + ".<" +defBoxValueType + ": void <init>()>()";
-        //     //         String expectedStringNew = "new " + defBoxValueType;
-        //     //         System.out.println("new method: " + expectedStringNew);
-        //     //         System.out.println("use box value string: " + useBoxValueString + " expectedString: " + expectedStringInit);
-        //     //         if(!useBoxValueString.equals(expectedStringInit) && !useBoxValueString.equals(expectedStringNew)){
-        //     //             System.out.println("that was unexepcted");
-        //     //         }
-        //     //     }
-        //     // }
-        // }
-        // for(ValueBox useBox : unit.getUseBoxes()){
-        //     System.out.println("use box value: " + useBox.getValue());
-        //     System.out.println("use box value type: " + useBox.getValue().getType());
-        // }
-        // for(ValueBox box : unit.getUseAndDefBoxes()){
+        if(unit.toString().equals("return")){
+            System.out.println("found return");
+        }
 
-        //     System.out.println("unit class: " + box.getValue());
-        //     System.out.println("value type: " + box.getValue().getType());
-
-        // }
-        
-        //if unit == file operation
-        // if unit is in in in set (check aliases)
-        //  switch operation
-        //    validate if operation is legit depending on state in set
-
+        copy(in, out);
     }
 
     @Override
