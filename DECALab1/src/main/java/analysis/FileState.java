@@ -1,5 +1,5 @@
 package analysis;
 
 public enum FileState {
-	Init, Open, Close
+	New, Init, Open, Close
 }
