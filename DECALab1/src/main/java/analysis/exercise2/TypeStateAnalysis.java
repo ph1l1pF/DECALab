@@ -9,11 +9,7 @@ import soot.Unit;
 import soot.Value;
 import soot.ValueBox;
 
-
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
 
@@ -154,9 +150,16 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
         System.out.println("merge begin");
         vulnerabilityFound = false;
 
+        Set<FileStateFact> fileStateFactsWithPartners1 = new HashSet<>();
+        Set<FileStateFact> fileStateFactsWithPartners2 = new HashSet<>();
+
         for (FileStateFact stateFact1 : in1) {
             for (FileStateFact stateFact2 : in2) {
                 if (commonAlias(factsToAliases.get(stateFact1), factsToAliases.get(stateFact2))) {
+
+                    fileStateFactsWithPartners1.add(stateFact1);
+                    fileStateFactsWithPartners2.add(stateFact2);
+
                     // merge
                     Set<Value> union = new HashSet<>();
                     factsToAliases.get(stateFact1).forEach(s -> union.add(s));
@@ -180,10 +183,20 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
                     out.add(mergedStateFact);
                 }
 
-
             }
         }
 
+        // add those fact which were not merged
+        for (FileStateFact st : in1) {
+            if (!fileStateFactsWithPartners1.contains(st)) {
+                out.add(st);
+            }
+        }
+        for (FileStateFact st : in2) {
+            if (!fileStateFactsWithPartners2.contains(st)) {
+                out.add(st);
+            }
+        }
 
     }
 
