@@ -8,6 +8,7 @@ import soot.Body;
 import soot.Unit;
 import soot.Value;
 import soot.ValueBox;
+import soot.Type;
 
 import java.util.HashSet;
 import java.util.HashMap;
@@ -17,111 +18,126 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
 
     private boolean vulnerabilityFound = false;
 
-    private HashMap<FileStateFact, Set<Value>> factsToAliases = new HashMap<FileStateFact, Set<Value>>();
+    private HashMap<String, Set<Value>> factsToAliases = new HashMap<String, Set<Value>>();
+    private HashMap<String, FileState> registerToStateMap = new HashMap<String, FileState>();
 
     public TypeStateAnalysis(Body body, VulnerabilityReporter reporter) {
         super(body, reporter);
     }
-    HashMap<String, FileState> registerToStateMap = new HashMap<String, FileState>();
+    private HashSet<String> declaredVariables = new HashSet<String>();
+    private HashMap<String, Value> declaredVariablesValue = new HashMap<String, Value>();
     @Override
     protected void flowThrough(Set<FileStateFact> in, Unit unit, Set<FileStateFact> out) {
 
-        System.out.println("flowthrough begin");
+        prettyPrint(in, unit, out);
 
-        // TODO: Implement your flow function here.
-        String targetRegister = null;
-        String targetType = null;
-        boolean newStatement = false;
-        Value boxValueStore = null;
+        for(ValueBox box : unit.getDefBoxes()){
+            Value defBoxValue = box.getValue();
+            Type defBoxType = defBoxValue.getType();
+            System.out.println("def box value: " + defBoxValue);
+            System.out.println("def box value type: " + defBoxType);
 
-        for(ValueBox box : unit.getUseAndDefBoxes()){
-            System.out.println("box value: " + box.getValue());
-            System.out.println("box value type: " + box.getValue().getType());
-            String boxValueType = box.getValue().getType().toString();
+            if(defBoxType.toString().endsWith(".File")){
+                System.out.println("Found declaration of new file object");
+                declaredVariables.add(defBoxValue.toString());
+                declaredVariablesValue.put(defBoxValue.toString(), defBoxValue);
+            }
+         }
 
-            if (targetRegister != null) {
-                String boxValue = box.getValue().toString();
-                if (boxValue.equals("new " + targetType)) {
-                    //add new FileStateFact to set
-                    System.out.println("found new call. adding: " + targetRegister);
-                    FileStateFact newFact = new FileStateFact(new HashSet<Value>(), FileState.Init);
-                    factsToAliases.put(newFact, new HashSet<Value>());
-                    System.out.println("Value to add to new fact: " + boxValueStore.toString());
-                    newFact.addAlias(boxValueStore);
-                    in.add(newFact);
-                    registerToStateMap.put(targetRegister, FileState.Init);
-                    newStatement = true;
-                } else {
-                    String methodCallInit = "specialinvoke " + targetRegister + ".<" + targetType + ": void <init>()>()";
-                    String methodCallOpen = "virtualinvoke " + targetRegister + ".<" + targetType + ": void open()>()";
-                    String methodCallClose = "virtualinvoke " + targetRegister + ".<" + targetType + ": void close()>()";
+         Value fileVariable = null;
+         Type fileType = null; 
+         for(ValueBox box : unit.getUseBoxes()){
+            Value useBoxValue = box.getValue();
+            Type useBoxType = useBoxValue.getType();
+            System.out.println("use box value: " + useBoxValue);
+            System.out.println("use box value type: " + useBoxType);
+            if(useBoxType.toString().endsWith(".File")){
+                fileVariable = useBoxValue;
+                fileType = useBoxType;
+            }
 
-                    if (boxValue.equals(methodCallInit)) {
-                        System.out.println("found init call");
-                        if(registerToStateMap.containsKey(targetRegister)){
-                            System.out.println("found map entry for " + targetRegister);
-
-                        }
-                      
-                    }
-                    else{
-                        if(unit.toString().contains(" = ") && !newStatement){
-                            System.out.println("found assignment statement");
-                            //set alias
-                        }
-                    }
-                    if (boxValue.equals(methodCallOpen)) {
-                        System.out.println("found open call");
-                        if(registerToStateMap.containsKey(targetRegister)){
-                            System.out.println("found map entry for open: " + targetRegister);
-                            if(registerToStateMap.get(targetRegister) == FileState.Init){
-                                System.out.println("open seems to be permittet");
-                            }
-                            else{
-                                this.reporter.reportVulnerability(this.method.getSignature(), unit);
-                            }
-                            
-                        }
-                    }
-                    if(boxValue.equals(methodCallClose)){
-                        if(registerToStateMap.containsKey(targetRegister)){
-                            System.out.println("found map entry for close: " + targetRegister);
-
-                        }
-                        else{
-                            System.out.println("close without init");
-                            this.reporter.reportVulnerability(this.method.getSignature(), unit);
-                        }
-                        System.out.println("found close call");
-                    }
-
-
+            if(unit.toString().contains(" = ")){
+                System.out.println("else part, unit statement could be an assignment " + unit.toString());
+                String [] variables = unit.toString().split("=");
+                //possibly already in file set
+                String source = variables[1].trim();
+                //has to be added as alias
+                String target = variables[0].trim();
+                System.out.println("found assignment, source: " + source + " and target: " + target);
+                FileStateFact f = getFileStateFact(in, source);
+                if(f != null){
+                    System.out.println("Found file fact to add alias for: " + f.toString());
+                    f.addAlias(declaredVariablesValue.get(target));
                 }
             }
-            if (boxValueType.endsWith(".File")) {
-                targetRegister = box.getValue().toString();
-                targetType = boxValueType;
-                boxValueStore = box.getValue();
+            else{
+                if(fileVariable != null){
+                    String methodCallInit = "specialinvoke " + fileVariable.toString() + ".<" + fileType.toString() + ": void <init>()>()";
+                    String methodCallOpen = "virtualinvoke " + fileVariable.toString() + ".<" + fileType.toString() + ": void open()>()";
+                    String methodCallClose = "virtualinvoke " + fileVariable.toString() + ".<" + fileType.toString() + ": void close()>()";
+                    if(declaredVariables.contains(fileVariable.toString())){
+                        if(useBoxValue.toString().equals(methodCallInit)){
+                            HashSet<Value> alias = new HashSet<Value>();
+                            alias.add(fileVariable);
+                            FileStateFact f = new FileStateFact(alias, FileState.Init);
+                            in.add(f);
+                        }
+                        else{
+                            FileStateFact f = getFileStateFact(in, fileVariable);
+                            if(f != null){
+                                if(useBoxValue.toString().equals(methodCallOpen)){
+            
+                                    if(f.getState() == FileState.Init || f.getState() == FileState.Close){
+                                        System.out.println("updated file state from init to open");
+                                        f.updateState(FileState.Open);
+                                        }
+                                    else{
+                                        //report error 
+                                        System.out.println("Vulnarbility 1");
+                                        reporter.reportVulnerability(this.method.getSignature(), unit);
+                                    }
+                                }
+                                else{
+                                    if(useBoxValue.toString().equals(methodCallClose)){
+                                        if(f.getState() == FileState.Init || f.getState() == FileState.Open ){
+                                            f.updateState(FileState.Close);
+                                        }
+                                        else{
+                                            //report error 
+                                            System.out.println("Vulnarbility 2");
+                                            reporter.reportVulnerability(this.method.getSignature(), unit);
+                                        }
+                                    }
+                                }
+                            }
+                            else{
+                            //report error
+                            //reporter.reportVulnerability(this.method.getSignature(), unit);
+                            }
+                        }
+                    }
+                    else{
+                        //variable wasn't declared before
+                    }
+                }
             }
         }
-        newStatement = false;
-        targetRegister = null;
-        boxValueStore = null;
-        targetType = null;
-        this.prettyPrint(in, unit, out);
 
         if(unit.toString().equals("return")){
             System.out.println("found return");
+            for(FileStateFact f : in){
+                if(f.isOpened()){
+                    reporter.reportVulnerability(this.method.getSignature(), unit);
+                }
+
+            }
         }
 
-  
-
-        System.out.println("flowthrough end");
-
-        if (vulnerabilityFound) {
-            reporter.reportVulnerability(this.method.getSignature(), unit);
-        }
+        // if (vulnerabilityFound) {
+        //     reporter.reportVulnerability(this.method.getSignature(), unit);
+        // }
         copy(in, out);
+        prettyPrint(in, unit, out);
     }
 
     @Override
@@ -136,7 +152,6 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
     protected void copy(Set<FileStateFact> source, Set<FileStateFact> dest) {
         for (FileStateFact fact : source) {
             FileStateFact copyState = fact.copy();
-            factsToAliases.put(copyState, factsToAliases.get(fact));
             dest.add(copyState);
         }
     }
@@ -144,57 +159,74 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
     @Override
     protected void merge(Set<FileStateFact> in1, Set<FileStateFact> in2, Set<FileStateFact> out) {
         // TODO: Implement the merge function here.
-        System.out.println("merge begin");
+
         vulnerabilityFound = false;
 
         Set<FileStateFact> fileStateFactsWithPartners1 = new HashSet<>();
         Set<FileStateFact> fileStateFactsWithPartners2 = new HashSet<>();
 
-        for (FileStateFact stateFact1 : in1) {
-            for (FileStateFact stateFact2 : in2) {
-                if (commonAlias(factsToAliases.get(stateFact1), factsToAliases.get(stateFact2))) {
+        // for (FileStateFact stateFact1 : in1) {
+        //     for (FileStateFact stateFact2 : in2) {
+        //         if (commonAlias(factsToAliases.get(stateFact1), factsToAliases.get(stateFact2))) {
 
-                    fileStateFactsWithPartners1.add(stateFact1);
-                    fileStateFactsWithPartners2.add(stateFact2);
+        //             fileStateFactsWithPartners1.add(stateFact1);
+        //             fileStateFactsWithPartners2.add(stateFact2);
 
-                    // merge
-                    Set<Value> union = new HashSet<>();
-                    factsToAliases.get(stateFact1).forEach(s -> union.add(s));
-                    factsToAliases.get(stateFact2).forEach(s -> union.add(s));
+        //             // merge
+        //             Set<Value> union = new HashSet<>();
+        //             factsToAliases.get(stateFact1).forEach(s -> union.add(s));
+        //             factsToAliases.get(stateFact2).forEach(s -> union.add(s));
 
-                    FileState newState = null;
+        //             FileState newState = null;
 
-                    if (stateFact1.getState().equals(stateFact2.getState())) {
-                        newState = stateFact1.getState();
-                    } else if ((stateFact1.getState().equals(FileState.Close) && stateFact2.getState().equals(FileState.Init)) ||
-                            (stateFact2.getState().equals(FileState.Close) && stateFact1.getState().equals(FileState.Init))) {
-                        newState = FileState.Close;
-                    } else if ((stateFact1.getState().equals(FileState.Init) && stateFact2.getState().equals(FileState.Open)) ||
-                            (stateFact2.getState().equals(FileState.Init) && stateFact1.getState().equals(FileState.Open))) {
-                        newState = FileState.Open;
-                    } else {
-                        vulnerabilityFound = true;
-                    }
+        //             if (stateFact1.getState().equals(stateFact2.getState())) {
+        //                 newState = stateFact1.getState();
+        //             } else if ((stateFact1.getState().equals(FileState.Close) && stateFact2.getState().equals(FileState.Init)) ||
+        //                     (stateFact2.getState().equals(FileState.Close) && stateFact1.getState().equals(FileState.Init))) {
+        //                 newState = FileState.Close;
+        //             } else if ((stateFact1.getState().equals(FileState.Init) && stateFact2.getState().equals(FileState.Open)) ||
+        //                     (stateFact2.getState().equals(FileState.Init) && stateFact1.getState().equals(FileState.Open))) {
+        //                 newState = FileState.Open;
+        //             } else {
+        //                 vulnerabilityFound = true;
+        //             }
 
-                    FileStateFact mergedStateFact = new FileStateFact(union, newState);
-                    out.add(mergedStateFact);
-                }
+        //             FileStateFact mergedStateFact = new FileStateFact(union, newState);
+        //             out.add(mergedStateFact);
+        //         }
 
+           // }
+        // }
+
+        // // add those fact which were not merged
+        // for (FileStateFact st : in1) {
+        //     if (!fileStateFactsWithPartners1.contains(st)) {
+        //         out.add(st);
+        //     }
+        // }
+        // for (FileStateFact st : in2) {
+        //     if (!fileStateFactsWithPartners2.contains(st)) {
+        //         out.add(st);
+        //     }
+        // }
+
+    }
+
+    private FileStateFact getFileStateFact(Set<FileStateFact> in, Value variable){
+        for(FileStateFact f : in){
+            if(f.containsAlias(variable)){
+                return f;
             }
         }
-
-        // add those fact which were not merged
-        for (FileStateFact st : in1) {
-            if (!fileStateFactsWithPartners1.contains(st)) {
-                out.add(st);
+        return null;
+    }
+    private FileStateFact getFileStateFact(Set<FileStateFact> in, String variable){
+        for(FileStateFact f : in){
+            if(f.containsAlias(variable)){
+                return f;
             }
         }
-        for (FileStateFact st : in2) {
-            if (!fileStateFactsWithPartners2.contains(st)) {
-                out.add(st);
-            }
-        }
-
+        return null;
     }
 
     private boolean commonAlias(Set<Value> s1, Set<Value> s2) {
