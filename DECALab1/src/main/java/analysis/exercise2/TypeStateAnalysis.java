@@ -10,6 +10,7 @@ import soot.jimple.internal.JInvokeStmt;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
 
@@ -22,6 +23,7 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
     }
 
     private HashSet<String> declaredVariables = new HashSet<String>();
+    private HashMap<String, Value> stringToValueMap = new HashMap<String, Value>();
 
     @Override
     protected void flowThrough(Set<FileStateFact> in, Unit unit, Set<FileStateFact> out) {
@@ -61,6 +63,8 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
                     FileStateFact f = getFileStateFact(out, source);
                     System.out.println("Found file fact to add alias for: " + f.toString());//Todo berücksichtige fälle für nicht File
                     f.addAlias(target);
+                    stringToValueMap.put(target.toString(), target);
+                    stringToValueMap.put(source.toString(), source);
                 }
 
             } else {
@@ -83,6 +87,7 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
                         } else {
                             HashSet<Value> alias = new HashSet<Value>();
                             alias.add(fileVariable);
+                            stringToValueMap.put(fileVariable.toString(), fileVariable);
                             FileStateFact f = new FileStateFact(alias, FileState.Init);
                             out.add(f);
                         }
@@ -250,7 +255,7 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
     }
 
 
-    private Set<String> getAliases(FileStateFact fileStateFact) {
+    private Set<Value> getAliases(FileStateFact fileStateFact) {
 
         String factString = fileStateFact.toString();
         System.out.println(factString);
@@ -260,10 +265,15 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
         System.out.println(tmp);
         String[] aliases = tmp.split(",");
         System.out.println(aliases);
-        HashSet<String> set = new HashSet<>();
+        HashSet<Value> set = new HashSet<Value>();
         for (String alias : aliases) {
-            set.add(alias);
+            //need to trim to remove whitespaces in order to finde
+            //the correct value in the hashmap
+            Value aliasValue = stringToValueMap.get(alias.trim());
+            if(aliasValue != null)
+                set.add(aliasValue);
         }
+        
         return set;
     }
 
