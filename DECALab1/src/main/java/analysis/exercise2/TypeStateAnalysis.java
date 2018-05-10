@@ -4,15 +4,13 @@ import analysis.FileState;
 import analysis.FileStateFact;
 import analysis.ForwardAnalysis;
 import analysis.VulnerabilityReporter;
-import soot.Body;
-import soot.Unit;
-import soot.Value;
-import soot.ValueBox;
-import soot.Type;
+import soot.*;
 import soot.jimple.internal.JAssignStmt;
 import soot.jimple.internal.JInvokeStmt;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
@@ -27,19 +25,17 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
 
     @Override
     protected void flowThrough(Set<FileStateFact> in, Unit unit, Set<FileStateFact> out) {
-
         prettyPrint(in, unit, out);
         copy(in, out);
+
+        List<Unit> unitsWithVuln = new ArrayList<>();
 
         //Find all Occurences of File
         for (ValueBox box : unit.getDefBoxes()) {
             Value defBoxValue = box.getValue();
             Type defBoxType = defBoxValue.getType();
-            System.out.println("def box value: " + defBoxValue);
-            System.out.println("def box value type: " + defBoxType);
 
             if (defBoxType.toString().endsWith(".File")) {
-                System.out.println("Found declaration of new file object");
                 declaredVariables.add(defBoxValue.toString());
             }
         }
@@ -49,8 +45,6 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
         for (ValueBox box : unit.getUseBoxes()) {
             Value useBoxValue = box.getValue();
             Type useBoxType = useBoxValue.getType();
-            System.out.println("use box value: " + useBoxValue);
-            System.out.println("use box value type: " + useBoxType);
             if (useBoxType.toString().endsWith(".File")) {
                 fileVariable = useBoxValue;
                 fileType = useBoxType;
@@ -58,12 +52,6 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
 
             //If Assignment
             if (unit instanceof JAssignStmt) {
-//                String[] variables = unit.toString().split("=");
-//                //possibly already in file set
-//                String source = variables[1].trim();
-//                //has to be added as alias
-//                String target = variables[0].trim();
-
                 JAssignStmt assignStmt = (JAssignStmt) unit;
                 Value target = assignStmt.leftBox.getValue();
                 Value source = assignStmt.rightBox.getValue();
@@ -78,7 +66,6 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
             } else {
                 //only if unit contains something about file
                 if (fileVariable != null && unit instanceof JInvokeStmt) {
-                    JInvokeStmt invokeStmt = (JInvokeStmt) unit;
 //                    JSpecialInvokeExpr specialInvokeExpr = (JSpecialInvokeExpr) invokeStmt.getInvokeExprBox().getValue();
 //                    Value variable= specialInvokeExpr.getBaseBox().getValue();
 
@@ -103,81 +90,71 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
                         //OPEN
                         FileStateFact currentFact = getFileStateFact(out, fileVariable);
                         if (currentFact == null) {
-                            reporter.reportVulnerability(this.method.getSignature(), unit);
-                        } else {
-                            if (currentFact.getState() == FileState.Init || currentFact.getState() == FileState.Open) {
-                                currentFact.updateState(FileState.Open);
-                            } else {
-                                reporter.reportVulnerability(this.method.getSignature(), unit);
-                            }
+                            unitsWithVuln.add(unit);
                         }
+                        if (!(currentFact.getState() == FileState.Init || currentFact.getState() == FileState.Open)) {
+                            unitsWithVuln.add(unit);
+                        }
+                        currentFact.updateState(FileState.Open);
+
                     } else if (useBoxValue.toString().equals(methodCallClose)) {
                         //Close
                         FileStateFact currentFact = getFileStateFact(out, fileVariable);
                         if (currentFact == null) {
 
-                            reporter.reportVulnerability(this.method.getSignature(), unit);
-                        } else {
-
-                            if (currentFact.getState() == FileState.Init || currentFact.getState() == FileState.Open) {
-                                currentFact.updateState(FileState.Close);
-                            } else {
-                                reporter.reportVulnerability(this.method.getSignature(), unit);
-                            }
+                            unitsWithVuln.add(unit);
                         }
+
+                        if (!(currentFact.getState() == FileState.Init || currentFact.getState() == FileState.Open)) {
+                            unitsWithVuln.add(unit);
+                        }
+                        currentFact.updateState(FileState.Close);
                     }
                 }
             }
         }
 
         if (unit.toString().equals("return")) {
-            System.out.println("found return");
 
             for (FileStateFact fileStateFact : out) {
-                System.out.println("FileStateFact: Aliases: ");
-                System.out.println(fileStateFact.toString());
-                System.out.println(" State: ");
-                System.out.println(fileStateFact.getState());
 
                 if (fileStateFact != null) {
-
                     getAliases(fileStateFact);
                 }
-                System.out.println(" DEBug: ");
-                System.out.println(" Debug: ");
                 HashSet<Value> alias = new HashSet<Value>();
                 //Value testValue= (Value) fileVariable.clone();
                 alias.add(fileVariable);
                 //alias.add(testValue);
                 FileStateFact testFact = new FileStateFact(alias, FileState.Init);
-                System.out.println("FileStateFact: Aliases: ");
-                System.out.println(testFact.toString());
-                System.out.println(" State: ");
-                System.out.println(testFact.getState());
             }
-            System.out.println(out.toString());
             for (FileStateFact f : out) {
                 if (f.isOpened()) {
-                    reporter.reportVulnerability(this.method.getSignature(), unit);
+//                    reporter.reportVulnerability(this.method.getSignature(), unit);
+                    unitsWithVuln.add(unit);
                 }
-
             }
         }
 
-        // if (vulnerabilityFound) {
-        //     reporter.reportVulnerability(this.method.getSignature(), unit);
-        // }
-        prettyPrint(in, unit, out);
+        System.out.println(unitsWithVuln.size() + " , " + method.getSignature());
+
+        for (Unit unitWithVuln : unitsWithVuln) {
+            reporter.reportVulnerability(this.method.getSignature(), unitWithVuln);
+        }
+
+//         if (vulnerabilityFound) {
+//             reporter.reportVulnerability(this.method.getSignature(), unit);
+//         }
+//        prettyPrint(in, unit, out);
     }
 
-    private FileStateFact hasFileStateFact(Value fileVariable, Set<FileStateFact> out) {
-        for (FileStateFact fileStateFact : out) {
-            if (fileStateFact.containsAlias(fileVariable)) {
-                return fileStateFact;
-            }
-        }
-        return null;
-    }
+//    private FileStateFact hasFileStateFact(Value fileVariable, Set<FileStateFact> out) {
+//        for (FileStateFact fileStateFact : out) {
+//            if (fileStateFact.containsAlias(fileVariable)) {
+//                return fileStateFact;
+//            }
+//        }
+//        return null;
+//    }
 
     @Override
     protected Set<FileStateFact> newInitialFlow() {
