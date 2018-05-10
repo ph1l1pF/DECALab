@@ -97,7 +97,7 @@ public class TypeStateAnalysis extends ForwardAnalysis<Set<FileStateFact>> {
                         if (currentFact == null) {
                             unitsWithVuln.add(unit);
                         }
-                        if (!(currentFact.getState() == FileState.Init || currentFact.getState() == FileState.Open)) {
+                        if (!(currentFact.getState() == FileState.Init || currentFact.getState() == FileState.Open || currentFact.getState() == FileState.Close)) {
                             unitsWithVuln.add(unit);
                         }
                         currentFact.updateState(FileState.Open);
