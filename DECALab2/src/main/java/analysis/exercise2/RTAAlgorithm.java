@@ -45,8 +45,6 @@ public class RTAAlgorithm extends CHAAlgorithm {
 			findClassesInstanciated(m);
 		});
 
-		classesInstanciated.forEach(c -> System.out.println(c));
-
 		Hierarchy h = scene.getActiveHierarchy();
 		entryPoints.forEach(m -> {
 			addNodeSafely(cg, m);
@@ -55,6 +53,10 @@ public class RTAAlgorithm extends CHAAlgorithm {
 
 	}
 
+	/**
+	 * Find all classes from which objects are created, beginning with method m. Works like depth-first search.
+	 * @param m
+	 */
 	private void findClassesInstanciated(SootMethod m) {
 		if (m.hasActiveBody()) {
 			for (Unit unit : m.getActiveBody().getUnits()) {
@@ -66,9 +68,30 @@ public class RTAAlgorithm extends CHAAlgorithm {
 					classesInstanciated.add(calledMethod.getDeclaringClass());
 				}
 				findClassesInstanciated(calledMethod);
-
 			}
 		}
+	}
+	
+	/**
+	 * Returns a list of direct and indirect subclasses of the given class c.
+	 * @param c
+	 * @param h
+	 * @return
+	 */
+	private List<SootClass> getDirectAndIndirectSubClasses(SootClass c, Hierarchy h) {
+		List<SootClass> childClasses = new ArrayList<>();
+		if (c.isInterface()) {
+			childClasses = h.getDirectImplementersOf(c);
+		} else {
+			childClasses = h.getDirectSubclassesOf(c);
+		}
+		List<SootClass> newList = new ArrayList<>();
+		newList.addAll(childClasses);
+		for (SootClass cc : childClasses) {
+			newList.addAll(getDirectAndIndirectSubClasses(cc, h));
+		}
+
+		return newList;
 	}
 
 	private SootMethod extractCalledMethodFromUnit(Unit unit) {
@@ -87,7 +110,7 @@ public class RTAAlgorithm extends CHAAlgorithm {
 
 	/**
 	 * Search through method m for other called methods m' in the body of m. Add
-	 * edges (m,m') and make recursive calls for those found methods m'.
+	 * edges (m,m') and make recursive calls for those found methods m'. Works like depth first search.
 	 * 
 	 * @param m
 	 *            The method we are currently going through.
@@ -113,14 +136,8 @@ public class RTAAlgorithm extends CHAAlgorithm {
 
 				// due to the possibility of polymorphic calls, we need to search for methods in
 				// sub classes too
-				SootClass declaringClass = rootMethod.getDeclaringClass();
 				if (!rootMethod.isConstructor()) {
-					List<SootClass> childClasses = new ArrayList<>();
-					if (declaringClass.isInterface()) {
-						childClasses = h.getDirectImplementersOf(declaringClass);
-					} else {
-						childClasses = h.getDirectSubclassesOf(declaringClass);
-					}
+					List<SootClass> childClasses = getDirectAndIndirectSubClasses(rootMethod.getDeclaringClass(), h);
 					for (SootClass childClass : childClasses) {
 						if (classesInstanciated.contains(childClass)) {
 							for (SootMethod childMethod : childClass.getMethods()) {
