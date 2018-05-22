@@ -14,6 +14,7 @@ import soot.SootClass;
 import soot.SootMethod;
 import soot.Unit;
 import soot.jimple.AssignStmt;
+import soot.jimple.InvokeStmt;
 import soot.jimple.internal.JAssignStmt;
 import soot.jimple.internal.JInvokeStmt;
 
@@ -102,8 +103,8 @@ public class RTAAlgorithm extends CHAAlgorithm {
 			if (ass.containsInvokeExpr()) {
 				method = ass.getInvokeExpr().getMethod();
 			}
-		} else if (unit instanceof JInvokeStmt) {
-			JInvokeStmt inv = (JInvokeStmt) unit;
+		} else if (unit instanceof InvokeStmt) {
+			InvokeStmt inv = (InvokeStmt) unit;
 			method = inv.getInvokeExpr().getMethod();
 		}
 		return method;
