@@ -32,17 +32,19 @@ public class RTAAlgorithm extends CHAAlgorithm {
 		// for you
 
 		Stream<SootMethod> stream = this.getEntryPoints(scene);
-		
-		
+
 		List<SootMethod> entryPoints = new ArrayList<>();
-		stream.forEach(m ->{
-			entryPoints.add(m);
+		stream.forEach(m -> {
+			if (m.getSignature().contains("exercise2")) {
+				entryPoints.add(m);
+			}
 		});
 
 		entryPoints.forEach(m -> {
+
 			findClassesInstanciated(m);
 		});
-		
+
 		classesInstanciated.forEach(c -> System.out.println(c));
 
 		Hierarchy h = scene.getActiveHierarchy();

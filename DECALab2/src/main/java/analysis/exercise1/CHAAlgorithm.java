@@ -31,12 +31,14 @@ public class CHAAlgorithm extends CallGraphAlgorithm {
 		Hierarchy h = scene.getActiveHierarchy();
 
 		stream.forEach(m -> {
-			addNodeSafely(cg, m);
-			findAndAddSuccessors(m, h, cg);
+			if (m.getSignature().contains("exercise1")) {
+				addNodeSafely(cg, m);
+				findAndAddSuccessors(m, h, cg);
+			}
 		});
 
 	}
-	
+
 	private SootMethod extractCalledMethodFromUnit(Unit unit) {
 		SootMethod method = null;
 		if (unit instanceof JAssignStmt) {
@@ -66,18 +68,19 @@ public class CHAAlgorithm extends CallGraphAlgorithm {
 		if (m.hasActiveBody()) {
 			for (Unit unit : m.getActiveBody().getUnits()) {
 
-				// find the method that is called by unit, if no method is called, go on with for loop
+				// find the method that is called by unit, if no method is called, go on with
+				// for loop
 				SootMethod rootMethod = extractCalledMethodFromUnit(unit);
-				if(rootMethod == null) {
+				if (rootMethod == null) {
 					continue;
 				}
-				
-				
+
 				// here we no that a called method was found
 				List<SootMethod> calledMethods = new ArrayList<>();
 				calledMethods.add(rootMethod);
 
-				// due to the possibility of polymorphic calls, we need to search for methods in sub classes too
+				// due to the possibility of polymorphic calls, we need to search for methods in
+				// sub classes too
 				SootClass declaringClass = rootMethod.getDeclaringClass();
 				if (!rootMethod.isConstructor()) {
 					List<SootClass> childClasses = new ArrayList<>();
@@ -95,8 +98,9 @@ public class CHAAlgorithm extends CallGraphAlgorithm {
 
 					}
 				}
-				
-				// now we have found all methods, so we add the nodes and edges to the call graph
+
+				// now we have found all methods, so we add the nodes and edges to the call
+				// graph
 				// and then make the recursive calls for each of the methods we found
 				for (SootMethod calledMethod : calledMethods) {
 					addNodeSafely(cg, calledMethod);
