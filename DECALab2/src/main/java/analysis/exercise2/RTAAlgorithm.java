@@ -64,9 +64,8 @@ public class RTAAlgorithm extends CHAAlgorithm {
 				}
 				if (calledMethod.isConstructor()) {
 					classesInstanciated.add(calledMethod.getDeclaringClass());
-				} else {
-					findClassesInstanciated(calledMethod);
 				}
+				findClassesInstanciated(calledMethod);
 
 			}
 		}
