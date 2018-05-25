@@ -1,4 +1,4 @@
-package exercises;
+package analysis.exercise3;
 
 public class RefTypeEdge {
 	
