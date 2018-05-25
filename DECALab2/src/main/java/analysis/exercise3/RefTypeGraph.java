@@ -47,7 +47,7 @@ public class RefTypeGraph {
 
     public void finaliseTypePropagationGraph() {
         boolean newChanges = true;
-        while (newChanges = true) {
+        while (newChanges) {
             newChanges = false;
             for (RefTypeEdge edge : edges) {
                 for (Type type : edge.getFirst().getTypes()) {
@@ -59,5 +59,39 @@ public class RefTypeGraph {
             }
         }
     }
+    
+    public boolean containsNode(FieldRef ref) {
+		for(RefTypeNode node : nodes) {
+			if(node.getRef().getField().getSignature().equals(ref.getField().getSignature())) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+
+
+	public RefTypeNode getNodeByRef(FieldRef ref) {
+		for(RefTypeNode node : nodes) {
+			if(node.getRef().getField().getSignature().equals(ref.getField().getSignature())) {
+				return node;
+			}
+		}
+		throw new IllegalArgumentException("ref not contained in graph");
+	}
+	
+	public void addEdgeByRefs(FieldRef ref1, FieldRef ref2) {
+		RefTypeNode n1 = getNodeByRef(ref1);
+		RefTypeNode n2 = getNodeByRef(ref2);
+		
+		//TODO: check whether edge is already contained
+		edges.add(new RefTypeEdge(n1, n2));
+	}
+
+
+	public void addNode(RefTypeNode node) {
+		nodes.add(node);
+		
+	}
 
 }
