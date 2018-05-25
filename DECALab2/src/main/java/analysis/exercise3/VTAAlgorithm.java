@@ -60,7 +60,7 @@ public class VTAAlgorithm extends CallGraphAlgorithm {
 								RefTypeNode node = new RefTypeNode(refLeft);
 								graph.addNode(node);
 							}
-					
+							contructInitGraph(method);
 							
 						}else {
 							if(ass.getRightOp() instanceof FieldRef) {
