@@ -4,11 +4,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 import soot.SootClass;
+import soot.Type;
 import soot.jimple.FieldRef;
 
 public class RefTypeNode {
-	
-	private List<SootClass> types;
+
+	private List<Type> types;
 	private FieldRef ref;
 
 	
@@ -17,11 +18,15 @@ public class RefTypeNode {
 		this.types = new ArrayList<>();
 		this.ref = ref;
 	}
-	public List<SootClass> getTypes() {
+
+	public List<Type> getTypes() {
 		return types;
 	}
-	public void addType(SootClass type) {
-		this.types.add(type);
+
+	public void addType(Type type) {
+		if (!containsType(type)) {
+			this.types.add(type);
+		}
 	}
 	public FieldRef getRef() {
 		return ref;
@@ -29,7 +34,9 @@ public class RefTypeNode {
 	public void setRef(FieldRef ref) {
 		this.ref = ref;
 	}
-	
-	
 
+
+	public boolean containsType(Type type) {
+		return types.contains(type);
+	}
 }
