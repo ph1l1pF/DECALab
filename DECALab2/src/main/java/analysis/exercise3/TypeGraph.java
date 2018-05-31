@@ -73,8 +73,6 @@ public class TypeGraph {
 		}
 
 		public boolean hasValue(Value v) {
-			System.out.println("hash compare: " + v.equivTo(this.v));
-			System.out.println("comparing values " + this.v + " to " + v + " with result " + (this.v == v));
 			return v.equivTo(this.v);
 		}
 
@@ -110,8 +108,6 @@ public class TypeGraph {
 		Node r = this.getNodeForValue(rightOp);
 		if (l != null && r != null)
 			this.edgeList.add(new Edge(l, r));
-		else
-			System.err.println("some node to add doesnt exist");
 
 	}
 }

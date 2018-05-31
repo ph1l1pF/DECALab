@@ -70,7 +70,7 @@ public class VTAAlgorithm extends CallGraphAlgorithm {
 
 		if (m.hasActiveBody()) {
 			for (Unit unit : m.getActiveBody().getUnits()) {
-				System.out.println("unit: " + unit);
+		
 				if (unit instanceof AssignStmt) {
 					AssignStmt ass = (AssignStmt) unit;
 					Value leftOp = ass.getLeftOp();
