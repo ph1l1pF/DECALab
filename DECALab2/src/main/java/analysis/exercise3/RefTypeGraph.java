@@ -1,11 +1,12 @@
 package analysis.exercise3;
 
-import soot.SootClass;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
+import soot.SootMethod;
 import soot.Type;
 import soot.jimple.FieldRef;
-
-import java.util.ArrayList;
-import java.util.List;
 
 public class RefTypeGraph {
 
@@ -13,13 +14,19 @@ public class RefTypeGraph {
 
     private List<RefTypeEdge> edges;
 
+    private HashMap<SootMethod, List<RefTypeNode>> methodNodeMap;
 
     public RefTypeGraph() {
         super();
+        this.methodNodeMap = new HashMap<SootMethod, List<RefTypeNode>>();
         this.nodes = new ArrayList<>();
         this.edges = new ArrayList<>();
     }
 
+    public List<RefTypeNode> getNodesForMethod(SootMethod m){
+    	
+    	return methodNodeMap.get(m);
+    }
 
     public List<RefTypeNode> getNodes() {
         return nodes;
@@ -89,8 +96,18 @@ public class RefTypeGraph {
 	}
 
 
-	public void addNode(RefTypeNode node) {
+	public void addNode(RefTypeNode node, SootMethod m) {
 		nodes.add(node);
+		System.out.println("here 12");
+		if(this.methodNodeMap.containsKey(m)) {
+			this.methodNodeMap.get(m).add(node);
+		}
+		else {
+			ArrayList<RefTypeNode> list = new ArrayList<RefTypeNode>();
+			list.add(node);
+			this.methodNodeMap.put(m, list);
+			System.out.println("added node to hash map, current map: " + this.methodNodeMap);
+		}
 		
 	}
 

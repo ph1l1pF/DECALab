@@ -35,10 +35,10 @@ public class CHAAlgorithm extends CallGraphAlgorithm {
 		Hierarchy h = scene.getActiveHierarchy();
 
 		stream.forEach(m -> {
-			if (m.getSignature().contains("exercise1")) {
+			//if (m.getSignature().contains("exercise1")) {
 				addNodeSafely(cg, m);
 				findAndAddSuccessors(m, h, cg);
-			}
+			//}
 		});
 
 	}
