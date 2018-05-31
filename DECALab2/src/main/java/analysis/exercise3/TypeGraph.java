@@ -14,11 +14,11 @@ public class TypeGraph {
 		this.nodeList = new ArrayList<Node>();
 		this.edgeList = new ArrayList<Edge>();
 	}
-	
-	public List<RefType> getAllTypes(){
+
+	public List<RefType> getAllTypes() {
 		List<RefType> l = new ArrayList<RefType>();
-		for(Node n : this.nodeList) {
-			for(RefType t : n.t) {
+		for (Node n : this.nodeList) {
+			for (RefType t : n.t) {
 				l.add(t);
 			}
 		}
@@ -74,7 +74,7 @@ public class TypeGraph {
 
 		public boolean hasValue(Value v) {
 			System.out.println("hash compare: " + v.equivTo(this.v));
-			System.out.println("comparing values " + this.v + " to " +  v + " with result " + (this.v == v));
+			System.out.println("comparing values " + this.v + " to " + v + " with result " + (this.v == v));
 			return v.equivTo(this.v);
 		}
 
@@ -85,11 +85,12 @@ public class TypeGraph {
 
 	private class Edge {
 		Node from, to;
-		
+
 		public Edge(Node from, Node to) {
 			this.from = from;
 			this.to = to;
 		}
+
 		public void printMe() {
 			System.out.println("edge from: " + from.v + " to: " + to.v);
 		}
