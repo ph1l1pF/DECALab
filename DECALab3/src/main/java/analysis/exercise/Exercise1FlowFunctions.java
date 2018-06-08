@@ -57,6 +57,7 @@ public class Exercise1FlowFunctions extends TaintAnalysisFlowFunctions {
 				
 				if(val.equals(DataFlowFact.zero())){
 					//TODO: Implement Exercise 1a) here
+					
 				}
 				if(call instanceof Stmt && call.toString().contains("executeQuery")){
 					Stmt stmt = (Stmt) call;
