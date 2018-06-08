@@ -10,6 +10,7 @@ import analysis.VulnerabilityReporter;
 import analysis.fact.DataFlowFact;
 import heros.FlowFunction;
 import soot.Local;
+import soot.SootField;
 import soot.SootMethod;
 import soot.Unit;
 import soot.Value;
@@ -30,15 +31,15 @@ public class Exercise1FlowFunctions extends TaintAnalysisFlowFunctions {
 		return new FlowFunction<DataFlowFact>() {
 			@Override
 			public Set<DataFlowFact> computeTargets(DataFlowFact fact) {
-				if(fact.equals(DataFlowFact.zero()))
+				if (fact.equals(DataFlowFact.zero()))
 					return Collections.emptySet();
 				prettyPrint(callSite, fact);
 				Set<DataFlowFact> out = Sets.newHashSet();
-				if(!(callSite instanceof Stmt)){
+				if (!(callSite instanceof Stmt)) {
 					return out;
 				}
 				Stmt callSiteStmt = (Stmt) callSite;
-				//TODO: Implement Exercise 1c) here
+				// TODO: Implement Exercise 1c) here
 				return out;
 			}
 		};
@@ -54,15 +55,29 @@ public class Exercise1FlowFunctions extends TaintAnalysisFlowFunctions {
 				Stmt callSiteStmt = (Stmt) call;
 				out.add(val);
 				modelStringOperations(val, out, callSiteStmt);
-				
-				if(val.equals(DataFlowFact.zero())){
-					//TODO: Implement Exercise 1a) here
-					
+
+				if (val.equals(DataFlowFact.zero())) {
+					// TODO: Implement Exercise 1a) here
+					if (call instanceof AssignStmt) {
+
+						if (call.toString().contains("getParameter(")) {
+							AssignStmt assign = (AssignStmt) call;
+							if (assign.getLeftOp() instanceof Local) {
+								Local local = (Local) assign.getLeftOp();
+								out.add(new DataFlowFact(local));
+							} else {
+								if (assign.getLeftOp() instanceof SootField) {
+									SootField ref = (SootField) assign.getLeftOp();
+									out.add(new DataFlowFact(ref));
+								}
+							}
+						}
+					}
 				}
-				if(call instanceof Stmt && call.toString().contains("executeQuery")){
+				if (call instanceof Stmt && call.toString().contains("executeQuery")) {
 					Stmt stmt = (Stmt) call;
 					Value arg = stmt.getInvokeExpr().getArg(0);
-					if(val.getVariable().equals(arg)){
+					if (val.getVariable().equals(arg)) {
 						reporter.reportVulnerability();
 					}
 				}
@@ -70,35 +85,42 @@ public class Exercise1FlowFunctions extends TaintAnalysisFlowFunctions {
 			}
 		};
 	}
-	private void modelStringOperations(DataFlowFact fact, Set<DataFlowFact> out,
-			Stmt callSiteStmt) {
-		if(callSiteStmt instanceof AssignStmt && callSiteStmt.toString().contains("java.lang.StringBuilder append(") && callSiteStmt.getInvokeExpr() instanceof InstanceInvokeExpr){
+
+	private void modelStringOperations(DataFlowFact fact, Set<DataFlowFact> out, Stmt callSiteStmt) {
+		if (callSiteStmt instanceof AssignStmt && callSiteStmt.toString().contains("java.lang.StringBuilder append(")
+				&& callSiteStmt.getInvokeExpr() instanceof InstanceInvokeExpr) {
 			Value arg0 = callSiteStmt.getInvokeExpr().getArg(0);
 			Value base = ((InstanceInvokeExpr) callSiteStmt.getInvokeExpr()).getBase();
-			/*Does the propagated value match the first parameter of the append call or the base variable*/
-			if(fact.getVariable().equals(arg0) || fact.getVariable().equals(base)){ 
-				/*Yes, then taint the left side of the assignment*/
+			/*
+			 * Does the propagated value match the first parameter of the append call or the
+			 * base variable
+			 */
+			if (fact.getVariable().equals(arg0) || fact.getVariable().equals(base)) {
+				/* Yes, then taint the left side of the assignment */
 				Value leftOp = ((AssignStmt) callSiteStmt).getLeftOp();
-				if(leftOp instanceof Local){
+				if (leftOp instanceof Local) {
 					out.add(new DataFlowFact((Local) leftOp));
 				}
 			}
 		}
-		
 
-		/*For any call x = var.toString(), if the base variable var is tainted, then x is tainted.*/
-		if(callSiteStmt instanceof AssignStmt && callSiteStmt.toString().contains("toString()")){
-			if(callSiteStmt.getInvokeExpr() instanceof InstanceInvokeExpr){
+		/*
+		 * For any call x = var.toString(), if the base variable var is tainted, then x
+		 * is tainted.
+		 */
+		if (callSiteStmt instanceof AssignStmt && callSiteStmt.toString().contains("toString()")) {
+			if (callSiteStmt.getInvokeExpr() instanceof InstanceInvokeExpr) {
 				InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) callSiteStmt.getInvokeExpr();
-				if(fact.getVariable().equals(instanceInvokeExpr.getBase())){
+				if (fact.getVariable().equals(instanceInvokeExpr.getBase())) {
 					Value leftOp = ((AssignStmt) callSiteStmt).getLeftOp();
-					if(leftOp instanceof Local){
+					if (leftOp instanceof Local) {
 						out.add(new DataFlowFact((Local) leftOp));
 					}
 				}
 			}
 		}
 	}
+
 	@Override
 	public FlowFunction<DataFlowFact> getNormalFlowFunction(final Unit curr, Unit succ) {
 		return new FlowFunction<DataFlowFact>() {
@@ -107,14 +129,15 @@ public class Exercise1FlowFunctions extends TaintAnalysisFlowFunctions {
 				prettyPrint(curr, fact);
 				Set<DataFlowFact> out = Sets.newHashSet();
 				out.add(fact);
-				//TODO: Implement Exercise 1b) here
+				// TODO: Implement Exercise 1b) here
 				return out;
 			}
 		};
 	}
 
 	@Override
-	public FlowFunction<DataFlowFact> getReturnFlowFunction(Unit callSite, SootMethod callee, Unit exitStmt, Unit retSite) {
+	public FlowFunction<DataFlowFact> getReturnFlowFunction(Unit callSite, SootMethod callee, Unit exitStmt,
+			Unit retSite) {
 		return new FlowFunction<DataFlowFact>() {
 			@Override
 			public Set<DataFlowFact> computeTargets(DataFlowFact fact) {
