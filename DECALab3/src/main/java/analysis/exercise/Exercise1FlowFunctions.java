@@ -130,6 +130,36 @@ public class Exercise1FlowFunctions extends TaintAnalysisFlowFunctions {
 				Set<DataFlowFact> out = Sets.newHashSet();
 				out.add(fact);
 				// TODO: Implement Exercise 1b) here
+				if (curr instanceof AssignStmt) {
+					
+					AssignStmt ass = (AssignStmt) curr;
+					DataFlowFact rightVariable = null;
+					if (ass.getRightOp() instanceof SootField) {
+						SootField rightField = (SootField) ass.getRightOp();
+						rightVariable = new DataFlowFact(rightField);
+					} else {
+						if (ass.getRightOp() instanceof Local) {
+							Local rightLocal = (Local) ass.getRightOp();
+							rightVariable = new DataFlowFact(rightLocal);
+						}
+					}
+					
+					if (out.contains(rightVariable)) {
+						
+						DataFlowFact leftVariable = null;
+						if (ass.getLeftOp() instanceof SootField) {
+							SootField leftField = (SootField) ass.getLeftOp();
+							leftVariable = new DataFlowFact(leftField);
+						} else {
+							if (ass.getLeftOp() instanceof Local) {
+								Local leftLocal = (Local) ass.getLeftOp();
+								leftVariable = new DataFlowFact(leftLocal);
+							}
+						}
+						
+						out.add(leftVariable);
+					}
+				}
 				return out;
 			}
 		};
