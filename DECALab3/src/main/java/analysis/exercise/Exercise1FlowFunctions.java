@@ -45,7 +45,7 @@ public class Exercise1FlowFunctions extends TaintAnalysisFlowFunctions {
                 // TODO: Implement Exercise 1c) here
 
                 if (callSiteStmt instanceof InvokeStmt) {
-                    System.out.println("callsite is invoke stmt");
+
                     InvokeExpr invoke = callSiteStmt.getInvokeExpr();
                     HashSet<Integer> taintedParams = new HashSet<Integer>();
                     for (int i = 0; i < invoke.getArgCount(); i++) {
