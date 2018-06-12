@@ -90,11 +90,6 @@ public class Exercise1FlowFunctions extends TaintAnalysisFlowFunctions {
                             if (assign.getLeftOp() instanceof Local) {
                                 Local local = (Local) assign.getLeftOp();
                                 out.add(new DataFlowFact(local));
-                            } else {
-                                if (assign.getLeftOp() instanceof SootField) {
-                                    SootField ref = (SootField) assign.getLeftOp();
-                                    out.add(new DataFlowFact(ref));
-                                }
                             }
                         }
                     }
@@ -159,14 +154,10 @@ public class Exercise1FlowFunctions extends TaintAnalysisFlowFunctions {
 
                     AssignStmt ass = (AssignStmt) curr;
                     DataFlowFact rightVariable = null;
-                    if (ass.getRightOp() instanceof SootField) {
-                        SootField rightField = (SootField) ass.getRightOp();
-                        rightVariable = new DataFlowFact(rightField);
-                    } else {
-                        if (ass.getRightOp() instanceof Local) {
-                            Local rightLocal = (Local) ass.getRightOp();
-                            rightVariable = new DataFlowFact(rightLocal);
-                        }
+
+                    if (ass.getRightOp() instanceof Local) {
+                        Local rightLocal = (Local) ass.getRightOp();
+                        rightVariable = new DataFlowFact(rightLocal);
                     }
 
                     if (out.contains(rightVariable)) {
