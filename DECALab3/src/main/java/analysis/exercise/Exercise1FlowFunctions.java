@@ -1,6 +1,7 @@
 package analysis.exercise;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 
 import com.google.common.collect.Sets;
@@ -16,6 +17,8 @@ import soot.Unit;
 import soot.Value;
 import soot.jimple.AssignStmt;
 import soot.jimple.InstanceInvokeExpr;
+import soot.jimple.InvokeExpr;
+import soot.jimple.InvokeStmt;
 import soot.jimple.Stmt;
 
 public class Exercise1FlowFunctions extends TaintAnalysisFlowFunctions {
@@ -40,6 +43,28 @@ public class Exercise1FlowFunctions extends TaintAnalysisFlowFunctions {
                 }
                 Stmt callSiteStmt = (Stmt) callSite;
                 // TODO: Implement Exercise 1c) here
+
+                if (callSiteStmt instanceof InvokeStmt) {
+                    System.out.println("callsite is invoke stmt");
+                    InvokeExpr invoke = callSiteStmt.getInvokeExpr();
+                    HashSet<Integer> taintedParams = new HashSet<Integer>();
+                    for (int i = 0; i < invoke.getArgCount(); i++) {
+                        Value v = invoke.getArg(i);
+                        if (v.equals(fact.getVariable())) {
+                            taintedParams.add(i);
+                        }
+                    }
+                    SootMethod m = invoke.getMethod();
+                    for (int i = 0; i < m.getActiveBody().getParameterLocals().size(); i++) {
+
+                        Local l = m.getActiveBody().getParameterLocal(i);
+
+                        if (taintedParams.contains(i)) {
+                            out.add(new DataFlowFact(l));
+                        }
+                    }
+
+                }
                 return out;
             }
         };
