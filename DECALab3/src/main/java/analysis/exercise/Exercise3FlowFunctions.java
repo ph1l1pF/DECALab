@@ -40,13 +40,13 @@ public class Exercise3FlowFunctions extends TaintAnalysisFlowFunctions {
 					return out;
 				}
 				Stmt callSiteStmt = (Stmt) callSite;
-				
-				//TODO: Implement Exercise 1c) here				
+
+                //TODO: Implement Exercise 1c) here
 				//TODO: Implement interprocedural part of Exercise 3 here.
 				return out;
 			}
 
-			
+
 		};
 	}
 
@@ -60,9 +60,9 @@ public class Exercise3FlowFunctions extends TaintAnalysisFlowFunctions {
 				Stmt callSiteStmt = (Stmt) call;
 				out.add(val);
 				modelStringOperations(val, out, callSiteStmt);
-				
+
 				if(val.equals(DataFlowFact.zero())){
-					//TODO: Implement Exercise 1a) here				
+                    //TODO: Implement Exercise 1a) here
 				}
 				if(call instanceof Stmt && call.toString().contains("executeQuery")){
 					Stmt stmt = (Stmt) call;
@@ -81,7 +81,7 @@ public class Exercise3FlowFunctions extends TaintAnalysisFlowFunctions {
 			Value arg0 = callSiteStmt.getInvokeExpr().getArg(0);
 			Value base = ((InstanceInvokeExpr) callSiteStmt.getInvokeExpr()).getBase();
 			/*Does the propagated value match the first parameter of the append call or the base variable*/
-			if(fact.getVariable().equals(arg0) || fact.getVariable().equals(base)){ 
+            if (fact.getVariable().equals(arg0) || fact.getVariable().equals(base)) {
 				/*Yes, then taint the left side of the assignment*/
 				Value leftOp = ((AssignStmt) callSiteStmt).getLeftOp();
 				if(leftOp instanceof Local){
@@ -89,9 +89,9 @@ public class Exercise3FlowFunctions extends TaintAnalysisFlowFunctions {
 				}
 			}
 		}
-		
 
-		/*For any call x = var.toString(), if the base variable var is tainted, then x is tainted.*/
+
+        /*For any call x = var.toString(), if the base variable var is tainted, then x is tainted.*/
 		if(callSiteStmt instanceof AssignStmt && callSiteStmt.toString().contains("toString()")){
 			if(callSiteStmt.getInvokeExpr() instanceof InstanceInvokeExpr){
 				InstanceInvokeExpr instanceInvokeExpr = (InstanceInvokeExpr) callSiteStmt.getInvokeExpr();
@@ -112,8 +112,8 @@ public class Exercise3FlowFunctions extends TaintAnalysisFlowFunctions {
 				prettyPrint(curr, fact);
 				Set<DataFlowFact> out = Sets.newHashSet();
 				out.add(fact);
-				
-				//TODO: Implement Exercise 1a) here
+
+                //TODO: Implement Exercise 1a) here
 				//TODO: Implement cases for field load and field store statement of Exercise 3) here
 				return out;
 			}
@@ -130,5 +130,5 @@ public class Exercise3FlowFunctions extends TaintAnalysisFlowFunctions {
 			}
 		};
 	}
-	
+
 }
