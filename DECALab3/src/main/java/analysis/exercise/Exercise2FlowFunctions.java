@@ -10,10 +10,7 @@ import analysis.TaintAnalysisFlowFunctions;
 import analysis.VulnerabilityReporter;
 import analysis.fact.DataFlowFact;
 import heros.FlowFunction;
-import soot.Local;
-import soot.SootMethod;
-import soot.Unit;
-import soot.Value;
+import soot.*;
 import soot.jimple.AssignStmt;
 import soot.jimple.FieldRef;
 import soot.jimple.InstanceInvokeExpr;
@@ -49,17 +46,9 @@ public class Exercise2FlowFunctions extends TaintAnalysisFlowFunctions {
                     HashSet<Integer> taintedParams = new HashSet<Integer>();
                     for (int i = 0; i < invoke.getArgCount(); i++) {
                         Value v = invoke.getArg(i);
-                        if (v.equals(fact.getVariable())) {
+                        if (v.equals(fact.getVariable()) && !fact.getVariable().equals("FIELDBASED")) {
                             taintedParams.add(i);
-                        } else {
-                            if (v instanceof FieldRef) {
-                                FieldRef ref = (FieldRef) v;
-                                if (ref.getField().equals(fact.getField())) {
-                                    taintedParams.add(i);
-                                }
-                            }
                         }
-
                     }
 
                     SootMethod m = invoke.getMethod();
@@ -70,6 +59,11 @@ public class Exercise2FlowFunctions extends TaintAnalysisFlowFunctions {
                         if (taintedParams.contains(i)) {
                             out.add(new DataFlowFact(l));
                         }
+                    }
+                    if (fact.getField() instanceof SootField) {
+                        SootField field = (SootField) fact.getField();
+                        System.out.println("test: " + field);
+                        out.add(new DataFlowFact(field));
                     }
 
                 }
