@@ -46,7 +46,7 @@ public class Exercise2FlowFunctions extends TaintAnalysisFlowFunctions {
                     HashSet<Integer> taintedParams = new HashSet<Integer>();
                     for (int i = 0; i < invoke.getArgCount(); i++) {
                         Value v = invoke.getArg(i);
-                        if (v.equals(fact.getVariable()) && !fact.getVariable().equals("FIELDBASED")) {
+                        if (v.equals(fact.getVariable())) {
                             taintedParams.add(i);
                         }
                     }
