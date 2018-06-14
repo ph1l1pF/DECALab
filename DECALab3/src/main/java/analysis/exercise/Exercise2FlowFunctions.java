@@ -130,7 +130,7 @@ public class Exercise2FlowFunctions extends TaintAnalysisFlowFunctions {
 
     private void modelStringOperations(DataFlowFact fact, Set<DataFlowFact> out, Stmt callSiteStmt) {
         if (callSiteStmt instanceof AssignStmt && callSiteStmt.toString().contains("java.lang.StringBuilder append(")
-                && callSiteStmt.getInvokeExpr() instanceof InstanceInvokeExpr) {
+            && callSiteStmt.getInvokeExpr() instanceof InstanceInvokeExpr) {
             Value arg0 = callSiteStmt.getInvokeExpr().getArg(0);
             Value base = ((InstanceInvokeExpr) callSiteStmt.getInvokeExpr()).getBase();
             /*
@@ -197,7 +197,7 @@ public class Exercise2FlowFunctions extends TaintAnalysisFlowFunctions {
                         }
                     }
                     System.out.println("searching for variable: " + rightVariable);
-                    if (out.contains(rightVariable)) {
+                    if (containsTaintedFact(out, rightVariable)) {
                         System.out.println("found tainted right variable: " + rightVariable + " at stmt " + curr);
                         DataFlowFact leftVariable = null;
                         if (ass.getLeftOp() instanceof FieldRef) {
@@ -224,9 +224,18 @@ public class Exercise2FlowFunctions extends TaintAnalysisFlowFunctions {
         };
     }
 
+    private boolean containsTaintedFact(Set<DataFlowFact> out, DataFlowFact inputFact) {
+        for (DataFlowFact fact : out) {
+            if (inputFact != null && (fact.equals(inputFact) || fact.toString().equals(inputFact.toString()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     public FlowFunction<DataFlowFact> getReturnFlowFunction(Unit callSite, SootMethod callee, Unit exitStmt,
-            Unit retSite) {
+                                                            Unit retSite) {
         return new FlowFunction<DataFlowFact>() {
             @Override
             public Set<DataFlowFact> computeTargets(DataFlowFact fact) {
