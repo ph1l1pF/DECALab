@@ -11,13 +11,11 @@ import analysis.VulnerabilityReporter;
 import analysis.fact.DataFlowFact;
 import heros.FlowFunction;
 import soot.Local;
-import soot.SootField;
 import soot.SootMethod;
 import soot.Unit;
 import soot.Value;
 import soot.jimple.AssignStmt;
 import soot.jimple.FieldRef;
-import soot.jimple.InstanceFieldRef;
 import soot.jimple.InstanceInvokeExpr;
 import soot.jimple.InvokeExpr;
 import soot.jimple.InvokeStmt;
@@ -53,8 +51,17 @@ public class Exercise2FlowFunctions extends TaintAnalysisFlowFunctions {
                         Value v = invoke.getArg(i);
                         if (v.equals(fact.getVariable())) {
                             taintedParams.add(i);
+                        } else {
+                            if (v instanceof FieldRef) {
+                                FieldRef ref = (FieldRef) v;
+                                if (ref.getField().equals(fact.getField())) {
+                                    taintedParams.add(i);
+                                }
+                            }
                         }
+
                     }
+
                     SootMethod m = invoke.getMethod();
                     for (int i = 0; i < m.getActiveBody().getParameterLocals().size(); i++) {
 
@@ -94,7 +101,7 @@ public class Exercise2FlowFunctions extends TaintAnalysisFlowFunctions {
                                 out.add(new DataFlowFact(local));
                             } else {
                                 if (assign.getLeftOp() instanceof FieldRef) {
-                                    System.out.println("left is field ref");
+
                                     FieldRef left = (FieldRef) assign.getLeftOp();
                                     out.add(new DataFlowFact(left.getField()));
                                 }
@@ -107,6 +114,13 @@ public class Exercise2FlowFunctions extends TaintAnalysisFlowFunctions {
                     Value arg = stmt.getInvokeExpr().getArg(0);
                     if (val.getVariable().equals(arg)) {
                         reporter.reportVulnerability();
+                    } else {
+                        if (arg instanceof FieldRef) {
+                            FieldRef ref = (FieldRef) arg;
+                            if (val.getField().equals(ref.getField())) {
+                                reporter.reportVulnerability();
+                            }
+                        }
                     }
                 }
                 return out;
@@ -128,6 +142,9 @@ public class Exercise2FlowFunctions extends TaintAnalysisFlowFunctions {
                 Value leftOp = ((AssignStmt) callSiteStmt).getLeftOp();
                 if (leftOp instanceof Local) {
                     out.add(new DataFlowFact((Local) leftOp));
+                } else if (leftOp instanceof FieldRef) {
+                    FieldRef ref = (FieldRef) leftOp;
+                    out.add(new DataFlowFact(ref.getField()));
                 }
             }
         }
@@ -143,6 +160,9 @@ public class Exercise2FlowFunctions extends TaintAnalysisFlowFunctions {
                     Value leftOp = ((AssignStmt) callSiteStmt).getLeftOp();
                     if (leftOp instanceof Local) {
                         out.add(new DataFlowFact((Local) leftOp));
+                    } else if (leftOp instanceof FieldRef) {
+                        FieldRef ref = (FieldRef) leftOp;
+                        out.add(new DataFlowFact(ref.getField()));
                     }
                 }
             }
@@ -169,25 +189,32 @@ public class Exercise2FlowFunctions extends TaintAnalysisFlowFunctions {
                         rightVariable = new DataFlowFact(rightLocal);
                     } else {
                         if (ass.getRightOp() instanceof FieldRef) {
+                            System.out.println("right variable is field ");
                             FieldRef rightLocal = (FieldRef) ass.getRightOp();
+                            System.out.println("right: " + rightLocal);
                             rightVariable = new DataFlowFact(rightLocal.getField());
+                            System.out.println("set " + out);
                         }
                     }
-
+                    System.out.println("searching for variable: " + rightVariable);
                     if (out.contains(rightVariable)) {
-
+                        System.out.println("found tainted right variable: " + rightVariable + " at stmt " + curr);
                         DataFlowFact leftVariable = null;
                         if (ass.getLeftOp() instanceof FieldRef) {
+                            System.out.println("left variable is field ");
                             FieldRef leftField = (FieldRef) ass.getLeftOp();
+                            System.out.println("test: " + leftField.getField());
                             leftVariable = new DataFlowFact(leftField.getField());
                         } else {
                             if (ass.getLeftOp() instanceof Local) {
+                                System.out.println("left variable is local ");
                                 Local leftLocal = (Local) ass.getLeftOp();
                                 leftVariable = new DataFlowFact(leftLocal);
                             }
                         }
-
+                        System.out.println("adding left variable: " + leftVariable);
                         out.add(leftVariable);
+                        System.out.println("set: " + out);
                     }
                 }
                 // TODO: Implement cases for field load and field store statement of Exercise 2)
