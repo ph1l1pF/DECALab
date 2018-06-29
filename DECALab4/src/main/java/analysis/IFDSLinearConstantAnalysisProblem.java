@@ -10,12 +10,12 @@ import heros.FlowFunctions;
 import heros.InterproceduralCFG;
 import heros.flowfunc.Identity;
 import heros.solver.Pair;
-import soot.Local;
-import soot.NullType;
-import soot.Scene;
-import soot.SootClass;
-import soot.SootMethod;
-import soot.Unit;
+import soot.*;
+import soot.jimple.AssignStmt;
+import soot.jimple.IntConstant;
+import soot.jimple.MulExpr;
+import soot.jimple.internal.JAddExpr;
+import soot.jimple.internal.JMulExpr;
 import soot.jimple.internal.JimpleLocal;
 import soot.jimple.toolkits.ide.DefaultJimpleIFDSTabulationProblem;
 
@@ -55,6 +55,26 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
             @Override
             public FlowFunction<Pair<Local, Integer>> getNormalFlowFunction(Unit curr, Unit next) {
                 // TODO: Implement this flow function factory to obtain an intra-procedural data-flow analysis.
+
+                if (curr instanceof AssignStmt) {
+                    AssignStmt assignStmt = (AssignStmt) curr;
+                    Local leftLocal = null;
+                    if (assignStmt.getLeftOp() instanceof Local) {
+                        leftLocal = (Local) assignStmt.getLeftOp();
+                    }
+                    if ((assignStmt.getRightOp() instanceof IntConstant) || (assignStmt.getRightOp() instanceof JAddExpr) || assignStmt.getRightOp() instanceof JMulExpr) {
+                        int result = evaluateExpression(assignStmt.getRightOp());
+                        if (leftLocal != null) {
+                            Pair pair = new Pair<Local, Integer>(leftLocal, result);
+                            //TODO return a Flowfunction
+                        } else {
+                            throw new UnsupportedOperationException("test");
+                        }
+
+                    }
+
+                }
+
                 return Identity.v();
             }
 
@@ -79,6 +99,31 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
                 return Identity.v();
             }
         };
+    }
+
+    private int evaluateExpression(Value expr) {
+
+        if (expr instanceof IntConstant) {
+            return ((IntConstant) expr).value;
+        } else if (expr instanceof Local) {
+            Local local = (Local) expr;
+            // TODO: iterate over data flow facts and get the value of local
+        } else if (expr instanceof JAddExpr) {
+            JAddExpr jAddExpr = (JAddExpr) expr;
+            if (jAddExpr.getSymbol().equals("+")) {
+                return evaluateExpression(jAddExpr.getOp1()) + evaluateExpression(jAddExpr.getOp2());
+            } else if (jAddExpr.getSymbol().equals("-")) {
+                return evaluateExpression(jAddExpr.getOp1()) - evaluateExpression(jAddExpr.getOp2());
+            }
+        } else if (expr instanceof JMulExpr) {
+            JMulExpr jMulExpr = (JMulExpr) expr;
+            if (jMulExpr.getSymbol().equals("*")) {
+                return evaluateExpression(jMulExpr.getOp1()) * evaluateExpression(jMulExpr.getOp2());
+            } else if (jMulExpr.getSymbol().equals("/")) {
+                return evaluateExpression(jMulExpr.getOp1()) * evaluateExpression(jMulExpr.getOp2());
+            }
+        }
+        throw new IllegalArgumentException("evaluateExpr failed: " + expr.getClass());
     }
 
     @Override
