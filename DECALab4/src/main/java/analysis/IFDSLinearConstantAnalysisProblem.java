@@ -120,7 +120,7 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
             if (jMulExpr.getSymbol().equals("*")) {
                 return evaluateExpression(jMulExpr.getOp1()) * evaluateExpression(jMulExpr.getOp2());
             } else if (jMulExpr.getSymbol().equals("/")) {
-                return evaluateExpression(jMulExpr.getOp1()) * evaluateExpression(jMulExpr.getOp2());
+                return evaluateExpression(jMulExpr.getOp1()) / evaluateExpression(jMulExpr.getOp2());
             }
         }
         throw new IllegalArgumentException("evaluateExpr failed: " + expr.getClass());
