@@ -1,6 +1,9 @@
 package analysis;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -52,10 +55,13 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
     @Override
     protected FlowFunctions<Unit, Pair<Local, Integer>, SootMethod> createFlowFunctionsFactory() {
         return new FlowFunctions<Unit, Pair<Local, Integer>, SootMethod>() {
+            
+            
             @Override
             public FlowFunction<Pair<Local, Integer>> getNormalFlowFunction(Unit curr, Unit next) {
                 // TODO: Implement this flow function factory to obtain an intra-procedural data-flow analysis.
 
+               
                 if (curr instanceof AssignStmt) {
                     AssignStmt assignStmt = (AssignStmt) curr;
                     Local leftLocal = null;
@@ -63,7 +69,9 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
                         leftLocal = (Local) assignStmt.getLeftOp();
                     }
                     if ((assignStmt.getRightOp() instanceof IntConstant) || (assignStmt.getRightOp() instanceof JAddExpr) || assignStmt.getRightOp() instanceof JMulExpr) {
-                        int result = evaluateExpression(assignStmt.getRightOp());
+                    
+                        // TODO: provide not null, but a sensible value to evaluateExpression
+                        int result = evaluateExpression(assignStmt.getRightOp(), null);
                         if (leftLocal != null) {
                             Pair pair = new Pair<Local, Integer>(leftLocal, result);
                             //TODO return a Flowfunction
@@ -74,7 +82,7 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
                     }
 
                 }
-
+                
                 return Identity.v();
             }
 
@@ -101,26 +109,36 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
         };
     }
 
-    private int evaluateExpression(Value expr) {
+    /**
+     * Evaluate the given expression given as a Value (depending on what subclass of Value expression is).
+     * @param expr
+     * @param dataFlowFacts
+     * @return An integer that comes out of the evaluation.
+     */
+    private int evaluateExpression(Value expr, List<Pair<Local,Integer>> dataFlowFacts) {
 
         if (expr instanceof IntConstant) {
             return ((IntConstant) expr).value;
         } else if (expr instanceof Local) {
             Local local = (Local) expr;
-            // TODO: iterate over data flow facts and get the value of local
+            for(Pair<Local, Integer> pair: dataFlowFacts) {
+                if(pair.getO1().getName().equals(local.getName())) {
+                    return pair.getO2();
+                }
+            }
         } else if (expr instanceof JAddExpr) {
             JAddExpr jAddExpr = (JAddExpr) expr;
-            if (jAddExpr.getSymbol().equals("+")) {
-                return evaluateExpression(jAddExpr.getOp1()) + evaluateExpression(jAddExpr.getOp2());
-            } else if (jAddExpr.getSymbol().equals("-")) {
-                return evaluateExpression(jAddExpr.getOp1()) - evaluateExpression(jAddExpr.getOp2());
+            if (jAddExpr.getSymbol().contains("+")) {
+                return evaluateExpression(jAddExpr.getOp1(),dataFlowFacts) + evaluateExpression(jAddExpr.getOp2(),dataFlowFacts);
+            } else if (jAddExpr.getSymbol().contains("-")) {
+                return evaluateExpression(jAddExpr.getOp1(),dataFlowFacts) - evaluateExpression(jAddExpr.getOp2(),dataFlowFacts);
             }
         } else if (expr instanceof JMulExpr) {
             JMulExpr jMulExpr = (JMulExpr) expr;
-            if (jMulExpr.getSymbol().equals("*")) {
-                return evaluateExpression(jMulExpr.getOp1()) * evaluateExpression(jMulExpr.getOp2());
-            } else if (jMulExpr.getSymbol().equals("/")) {
-                return evaluateExpression(jMulExpr.getOp1()) / evaluateExpression(jMulExpr.getOp2());
+            if (jMulExpr.getSymbol().contains("*")) {
+                return evaluateExpression(jMulExpr.getOp1(),dataFlowFacts) * evaluateExpression(jMulExpr.getOp2(),dataFlowFacts);
+            } else if (jMulExpr.getSymbol().contains("/")) {
+                return evaluateExpression(jMulExpr.getOp1(),dataFlowFacts) / evaluateExpression(jMulExpr.getOp2(),dataFlowFacts);
             }
         }
         throw new IllegalArgumentException("evaluateExpr failed: " + expr.getClass());
