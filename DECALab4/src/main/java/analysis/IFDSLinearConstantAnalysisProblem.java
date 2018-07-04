@@ -77,10 +77,16 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
                             if ((assignStmt.getRightOp() instanceof IntConstant) || (assignStmt.getRightOp() instanceof JAddExpr) || assignStmt.getRightOp() instanceof JMulExpr) {
 
                                 // TODO: provide not null, but a sensible value to evaluateExpression
-                                int result = evaluateExpression(assignStmt.getRightOp(), curr);
+                                int result = evaluateExpression(assignStmt.getRightOp(), curr, 0);
                                 if (leftLocal != null) {
-                                    Pair pair = new Pair<Local, Integer>(leftLocal, result);
-
+                                    Pair pair = null;
+                                    if (result < UPPER_BOUND && result > LOWER_BOUND) {
+                                        pair = new Pair<Local, Integer>(leftLocal, result);
+                                    } else if (result >= UPPER_BOUND) {
+                                        pair = new Pair<Local, Integer>(leftLocal, UPPER_BOUND);
+                                    } else if (result <= LOWER_BOUND) {
+                                        pair = new Pair<Local, Integer>(leftLocal, LOWER_BOUND);
+                                    }
                                     addNewDataFlowFactToSet(returnSet, pair);
                                 } else {
                                     //Do nothing, because no Action necessary for other types of left operators
@@ -128,7 +134,8 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
         tmpSet.addAll(pairSet);
         for (Pair<Local, Integer> pair : tmpSet) {
             if (pair.getO1().getName().equals(paramPair.getO1().getName())) {
-                pairSet.remove(pair);
+                //NOTE: Seems so that no remove should be done
+//                pairSet.remove(pair);
             }
         }
         pairSet.add(paramPair);
@@ -141,7 +148,14 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
      * @param unit
      * @return An integer that comes out of the evaluation.
      */
-    private int evaluateExpression(Value expr, Unit unit) {
+    private int evaluateExpression(Value expr, Unit unit, int depth) {
+//TODO depth noch nicht die optimale lösung
+        if (depth >= UPPER_BOUND) {
+            return UPPER_BOUND;
+        } else if (depth <= LOWER_BOUND) {
+            return LOWER_BOUND;
+        }
+
 
         if (expr instanceof IntConstant) {
             return ((IntConstant) expr).value;
@@ -154,21 +168,23 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
             } else if (integerSet.size() == 1) {
                 return integerSet.get(0);
             } else {
-                throw new ParameterException("more than one DataflowFact for the local: " + local);
+                System.out.println(integerSet);
+                return integerSet.get(integerSet.size() - 1);
+                //throw new ParameterException("more than one DataflowFact for the local: " + local);
             }
         } else if (expr instanceof JAddExpr) {
             JAddExpr jAddExpr = (JAddExpr) expr;
             if (jAddExpr.getSymbol().contains("+")) {
-                return evaluateExpression(jAddExpr.getOp1(), unit) + evaluateExpression(jAddExpr.getOp2(), unit);
+                return evaluateExpression(jAddExpr.getOp1(), unit, depth++) + evaluateExpression(jAddExpr.getOp2(), unit, depth++);
             } else if (jAddExpr.getSymbol().contains("-")) {
-                return evaluateExpression(jAddExpr.getOp1(), unit) - evaluateExpression(jAddExpr.getOp2(), unit);
+                return evaluateExpression(jAddExpr.getOp1(), unit, depth++) - evaluateExpression(jAddExpr.getOp2(), unit, depth--);
             }
         } else if (expr instanceof JMulExpr) {
             JMulExpr jMulExpr = (JMulExpr) expr;
             if (jMulExpr.getSymbol().contains("*")) {
-                return evaluateExpression(jMulExpr.getOp1(), unit) * evaluateExpression(jMulExpr.getOp2(), unit);
+                return evaluateExpression(jMulExpr.getOp1(), unit, depth++) * evaluateExpression(jMulExpr.getOp2(), unit, depth++);
             } else if (jMulExpr.getSymbol().contains("/")) {
-                return evaluateExpression(jMulExpr.getOp1(), unit) / evaluateExpression(jMulExpr.getOp2(), unit);
+                return evaluateExpression(jMulExpr.getOp1(), unit, depth++) / evaluateExpression(jMulExpr.getOp2(), unit, depth++);
             }
         }
         throw new IllegalArgumentException("evaluateExpr failed: " + expr.getClass());
@@ -180,12 +196,12 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
 
     /**
      * Size=0 => kein Dataflow fact existiert für das Local zu diesem Zeitpunkt, sonst size=1
-     *
      * @param unit
      * @param local
      * @return
      */
     private List<Integer> getDataFlowValueFromUnitAndLocal(Unit unit, Local local) {
+        System.out.println("Set: " + getDataFlowFactsFromUnit(unit));
         Set<Pair<Local, Integer>> pairSet = getDataFlowFactsFromUnit(unit);
         List<Integer> integerSet = new ArrayList<>();
         for (Pair<Local, Integer> pair : pairSet) {
