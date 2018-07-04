@@ -1,12 +1,8 @@
 package analysis;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
+import com.beust.jcommander.ParameterException;
 import heros.DefaultSeeds;
 import heros.FlowFunction;
 import heros.FlowFunctions;
@@ -16,7 +12,6 @@ import heros.solver.Pair;
 import soot.*;
 import soot.jimple.AssignStmt;
 import soot.jimple.IntConstant;
-import soot.jimple.MulExpr;
 import soot.jimple.internal.JAddExpr;
 import soot.jimple.internal.JMulExpr;
 import soot.jimple.internal.JimpleLocal;
@@ -30,9 +25,12 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
 
     protected InterproceduralCFG<Unit, SootMethod> icfg;
 
+    private Map<Unit, Set<Pair<Local, Integer>>> unitSetMap;
+
     public IFDSLinearConstantAnalysisProblem(InterproceduralCFG<Unit, SootMethod> icfg) {
         super(icfg);
         this.icfg = icfg;
+        unitSetMap = initialSeeds();
     }
 
     @Override
@@ -55,35 +53,51 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
     @Override
     protected FlowFunctions<Unit, Pair<Local, Integer>, SootMethod> createFlowFunctionsFactory() {
         return new FlowFunctions<Unit, Pair<Local, Integer>, SootMethod>() {
-            
-            
+
+
             @Override
             public FlowFunction<Pair<Local, Integer>> getNormalFlowFunction(Unit curr, Unit next) {
                 // TODO: Implement this flow function factory to obtain an intra-procedural data-flow analysis.
 
-               
-                if (curr instanceof AssignStmt) {
-                    AssignStmt assignStmt = (AssignStmt) curr;
-                    Local leftLocal = null;
-                    if (assignStmt.getLeftOp() instanceof Local) {
-                        leftLocal = (Local) assignStmt.getLeftOp();
-                    }
-                    if ((assignStmt.getRightOp() instanceof IntConstant) || (assignStmt.getRightOp() instanceof JAddExpr) || assignStmt.getRightOp() instanceof JMulExpr) {
-                    
-                        // TODO: provide not null, but a sensible value to evaluateExpression
-                        int result = evaluateExpression(assignStmt.getRightOp(), null);
-                        if (leftLocal != null) {
-                            Pair pair = new Pair<Local, Integer>(leftLocal, result);
-                            //TODO return a Flowfunction
-                        } else {
-                            throw new UnsupportedOperationException("test");
+
+                FlowFunction<Pair<Local, Integer>> flowFunction = new FlowFunction<Pair<Local, Integer>>() {
+
+                    @Override
+                    public Set<Pair<Local, Integer>> computeTargets(Pair<Local, Integer> localIntegerPair) {
+                        Set<Pair<Local, Integer>> returnSet = new HashSet<>();
+                        returnSet.addAll(getDataFlowFactsFromUnit(curr));
+
+
+                        if (curr instanceof AssignStmt) {
+                            AssignStmt assignStmt = (AssignStmt) curr;
+                            Local leftLocal = null;
+                            if (assignStmt.getLeftOp() instanceof Local) {
+                                leftLocal = (Local) assignStmt.getLeftOp();
+                            }
+                            if ((assignStmt.getRightOp() instanceof IntConstant) || (assignStmt.getRightOp() instanceof JAddExpr) || assignStmt.getRightOp() instanceof JMulExpr) {
+
+                                // TODO: provide not null, but a sensible value to evaluateExpression
+                                int result = evaluateExpression(assignStmt.getRightOp(), curr);
+                                if (leftLocal != null) {
+                                    Pair pair = new Pair<Local, Integer>(leftLocal, result);
+
+                                    addNewDataFlowFactToSet(returnSet, pair);
+                                } else {
+                                    //Do nothing, because no Action necessary for other types of left operators
+                                    //throw new UnsupportedOperationException("test");
+                                }
+
+                            }
+
                         }
-
+                        unitSetMap.put(next, returnSet);
+                        return returnSet;
                     }
 
-                }
-                
-                return Identity.v();
+
+                };
+
+                return flowFunction;
             }
 
             @Override
@@ -109,39 +123,77 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
         };
     }
 
+    private void addNewDataFlowFactToSet(Set<Pair<Local, Integer>> pairSet, Pair<Local, Integer> paramPair) {
+        Set<Pair<Local, Integer>> tmpSet = new HashSet<>();
+        tmpSet.addAll(pairSet);
+        for (Pair<Local, Integer> pair : tmpSet) {
+            if (pair.getO1().getName().equals(paramPair.getO1().getName())) {
+                pairSet.remove(pair);
+            }
+        }
+        pairSet.add(paramPair);
+    }
+
     /**
      * Evaluate the given expression given as a Value (depending on what subclass of Value expression is).
+     *
      * @param expr
-     * @param dataFlowFacts
+     * @param unit
      * @return An integer that comes out of the evaluation.
      */
-    private int evaluateExpression(Value expr, List<Pair<Local,Integer>> dataFlowFacts) {
+    private int evaluateExpression(Value expr, Unit unit) {
 
         if (expr instanceof IntConstant) {
             return ((IntConstant) expr).value;
         } else if (expr instanceof Local) {
             Local local = (Local) expr;
-            for(Pair<Local, Integer> pair: dataFlowFacts) {
-                if(pair.getO1().getName().equals(local.getName())) {
-                    return pair.getO2();
-                }
+            List<Integer> integerSet = getDataFlowValueFromUnitAndLocal(unit, local);
+            if (integerSet.size() == 0) {
+                //Local not defiend
+                throw new ParameterException("no DataflowFact for the local: " + local);
+            } else if (integerSet.size() == 1) {
+                return integerSet.get(0);
+            } else {
+                throw new ParameterException("more than one DataflowFact for the local: " + local);
             }
         } else if (expr instanceof JAddExpr) {
             JAddExpr jAddExpr = (JAddExpr) expr;
             if (jAddExpr.getSymbol().contains("+")) {
-                return evaluateExpression(jAddExpr.getOp1(),dataFlowFacts) + evaluateExpression(jAddExpr.getOp2(),dataFlowFacts);
+                return evaluateExpression(jAddExpr.getOp1(), unit) + evaluateExpression(jAddExpr.getOp2(), unit);
             } else if (jAddExpr.getSymbol().contains("-")) {
-                return evaluateExpression(jAddExpr.getOp1(),dataFlowFacts) - evaluateExpression(jAddExpr.getOp2(),dataFlowFacts);
+                return evaluateExpression(jAddExpr.getOp1(), unit) - evaluateExpression(jAddExpr.getOp2(), unit);
             }
         } else if (expr instanceof JMulExpr) {
             JMulExpr jMulExpr = (JMulExpr) expr;
             if (jMulExpr.getSymbol().contains("*")) {
-                return evaluateExpression(jMulExpr.getOp1(),dataFlowFacts) * evaluateExpression(jMulExpr.getOp2(),dataFlowFacts);
+                return evaluateExpression(jMulExpr.getOp1(), unit) * evaluateExpression(jMulExpr.getOp2(), unit);
             } else if (jMulExpr.getSymbol().contains("/")) {
-                return evaluateExpression(jMulExpr.getOp1(),dataFlowFacts) / evaluateExpression(jMulExpr.getOp2(),dataFlowFacts);
+                return evaluateExpression(jMulExpr.getOp1(), unit) / evaluateExpression(jMulExpr.getOp2(), unit);
             }
         }
         throw new IllegalArgumentException("evaluateExpr failed: " + expr.getClass());
+    }
+
+    private Set<Pair<Local, Integer>> getDataFlowFactsFromUnit(Unit unit) {
+        return unitSetMap.get(unit);
+    }
+
+    /**
+     * Size=0 => kein Dataflow fact existiert für das Local zu diesem Zeitpunkt, sonst size=1
+     *
+     * @param unit
+     * @param local
+     * @return
+     */
+    private List<Integer> getDataFlowValueFromUnitAndLocal(Unit unit, Local local) {
+        Set<Pair<Local, Integer>> pairSet = getDataFlowFactsFromUnit(unit);
+        List<Integer> integerSet = new ArrayList<>();
+        for (Pair<Local, Integer> pair : pairSet) {
+            if (pair.getO1().getName().equals(local.getName())) {
+                integerSet.add(pair.getO2());
+            }
+        }
+        return integerSet;
     }
 
     @Override
