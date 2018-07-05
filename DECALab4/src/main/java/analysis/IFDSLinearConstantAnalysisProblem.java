@@ -12,9 +12,9 @@ import heros.solver.Pair;
 import soot.*;
 import soot.jimple.AssignStmt;
 import soot.jimple.IntConstant;
-import soot.jimple.internal.JAddExpr;
-import soot.jimple.internal.JMulExpr;
-import soot.jimple.internal.JimpleLocal;
+import soot.jimple.InvokeExpr;
+import soot.jimple.InvokeStmt;
+import soot.jimple.internal.*;
 import soot.jimple.toolkits.ide.DefaultJimpleIFDSTabulationProblem;
 
 public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulationProblem<Pair<Local, Integer>, InterproceduralCFG<Unit, SootMethod>> {
@@ -79,22 +79,9 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
                                 // TODO: provide not null, but a sensible value to evaluateExpression
                                 int result = evaluateExpression(assignStmt.getRightOp(), curr, 0);
                                 if (leftLocal != null) {
-                                    Pair pair = null;
-                                    if (result < UPPER_BOUND && result > LOWER_BOUND) {
-                                        pair = new Pair<Local, Integer>(leftLocal, result);
-                                    } else if (result >= UPPER_BOUND) {
-                                        pair = new Pair<Local, Integer>(leftLocal, UPPER_BOUND);
-                                    } else if (result <= LOWER_BOUND) {
-                                        pair = new Pair<Local, Integer>(leftLocal, LOWER_BOUND);
-                                    }
-                                    addNewDataFlowFactToSet(returnSet, pair);
-                                } else {
-                                    //Do nothing, because no Action necessary for other types of left operators
-                                    //throw new UnsupportedOperationException("test");
+                                    addNewDataFlowFactToSet(returnSet, leftLocal, result);
                                 }
-
                             }
-
                         }
                         unitSetMap.put(next, returnSet);
                         return returnSet;
@@ -110,7 +97,45 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
             public FlowFunction<Pair<Local, Integer>> getCallFlowFunction(Unit callsite, SootMethod dest) {
                 // TODO: Implement this flow function factory to map the actual into the formal arguments.
                 // Caution, actual parameters may be integer literals as well.
-                return Identity.v();
+                Set<Pair<Local, Integer>> returnSet = new HashSet<>();
+                returnSet.add(createZeroValue());
+
+                FlowFunction<Pair<Local, Integer>> flowFunction = new FlowFunction<Pair<Local, Integer>>() {
+                    @Override
+                    public Set<Pair<Local, Integer>> computeTargets(Pair<Local, Integer> localIntegerPair) {
+
+
+                        JAssignStmt jAssignStmt = null;
+                        InvokeExpr invokeExpr = null;
+                        System.out.println(dest.getSignature());
+                        System.out.println(dest.getActiveBody());
+//                        System.out.println("Locals:" + dest.getActiveBody().getParameterLocals());
+//                        System.out.println("Values: "+ dest.getActiveBody().getParameterRefs());
+
+
+                        if (callsite instanceof JAssignStmt) {
+                            jAssignStmt = (JAssignStmt) callsite;
+                            if (jAssignStmt.containsInvokeExpr()) {
+                                invokeExpr = jAssignStmt.getInvokeExpr();
+                            }
+                        }
+
+                        if (invokeExpr != null) {
+                            List<Value> listCallsite = invokeExpr.getArgs();
+                            List<Local> listMethodSite = dest.getActiveBody().getParameterLocals();
+
+                            for (int i = 0; i < listCallsite.size(); i++) {
+                                int result = evaluateExpression(listCallsite.get(i), callsite, 0);
+                                addNewDataFlowFactToSet(returnSet, listMethodSite.get(i), result);
+                            }
+                        }
+                        if (dest.hasActiveBody()) {
+                            unitSetMap.put(dest.getActiveBody().getUnits().getFirst(), returnSet);
+                        }
+                        return returnSet;
+                    }
+                };
+                return flowFunction;
             }
 
             @Override
@@ -118,27 +143,87 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
                 // TODO: Map the return value back into the caller's context if applicable.
                 // Since Java has pass-by-value semantics for primitive data types, you do not have to map the formals
                 // back to the actuals at the exit of the callee.
-                return Identity.v();
+                Set<Pair<Local, Integer>> returnSet = new HashSet<>();
+//                returnSet.addAll(getDataFlowFactsFromUnit(callsite));
+
+                FlowFunction<Pair<Local, Integer>> flowFunction = new FlowFunction<Pair<Local, Integer>>() {
+                    @Override
+                    public Set<Pair<Local, Integer>> computeTargets(Pair<Local, Integer> localIntegerPair) {
+                        System.out.println("ReturnFlow");
+                        System.out.println(exit);
+                        System.out.println(exit.getClass());
+                        System.out.println(retsite);
+                        System.out.println(retsite.getClass());
+
+                        if (exit instanceof JReturnStmt) {
+                            JReturnStmt jReturnStmt = (JReturnStmt) exit;
+                            Value value = jReturnStmt.getOp();
+                            int result = evaluateExpression(value, exit, 0);
+
+                            JAssignStmt jAssignStmt = null;
+                            if (retsite instanceof JAssignStmt) {
+                                jAssignStmt = (JAssignStmt) retsite;
+                                if (jAssignStmt.getLeftOp() instanceof Local) {
+                                    addNewDataFlowFactToSet(returnSet, (Local) jAssignStmt.getLeftOp(), result);
+                                }
+                            }
+
+                        }
+
+                        Set<Pair<Local, Integer>> set = unitSetMap.get(retsite);
+                        set.addAll(returnSet);
+                        unitSetMap.put(retsite, set);
+                        return returnSet;
+                    }
+                };
+                return flowFunction;
+
             }
+
 
             @Override
             public FlowFunction<Pair<Local, Integer>> getCallToReturnFlowFunction(Unit callsite, Unit retsite) {
                 // TODO: getCallToReturnFlowFunction can be left to return id in many analysis; this time as well?
-                return Identity.v();
+                Set<Pair<Local, Integer>> returnSet = new HashSet<>();
+                returnSet.addAll(getDataFlowFactsFromUnit(callsite));
+
+                FlowFunction<Pair<Local, Integer>> flowFunction = new FlowFunction<Pair<Local, Integer>>() {
+                    @Override
+                    public Set<Pair<Local, Integer>> computeTargets(Pair<Local, Integer> localIntegerPair) {
+//                        System.out.println("CallToReturn");
+//                        System.out.println(callsite);
+//                        System.out.println(callsite.getClass());
+//                        System.out.println(retsite);
+//                        System.out.println(retsite.getClass());
+
+                        unitSetMap.put(retsite, returnSet);
+                        return returnSet;
+                    }
+                };
+                return flowFunction;
             }
         };
     }
 
-    private void addNewDataFlowFactToSet(Set<Pair<Local, Integer>> pairSet, Pair<Local, Integer> paramPair) {
+    private void addNewDataFlowFactToSet(Set<Pair<Local, Integer>> pairSet, Local local, int result) {
+        Pair<Local, Integer> pair = null;
+        if (result < UPPER_BOUND && result > LOWER_BOUND) {
+            pair = new Pair<Local, Integer>(local, result);
+        } else if (result >= UPPER_BOUND) {
+            pair = new Pair<Local, Integer>(local, UPPER_BOUND);
+        } else if (result <= LOWER_BOUND) {
+            pair = new Pair<Local, Integer>(local, LOWER_BOUND);
+        }
+
+
         Set<Pair<Local, Integer>> tmpSet = new HashSet<>();
         tmpSet.addAll(pairSet);
-        for (Pair<Local, Integer> pair : tmpSet) {
-            if (pair.getO1().getName().equals(paramPair.getO1().getName())) {
-                //NOTE: Seems so that no remove should be done
-//                pairSet.remove(pair);
+        for (Pair<Local, Integer> pairOfSet : tmpSet) {
+            if (pairOfSet.getO1().getName().equals(pair.getO1().getName())) {
+                pairSet.remove(pairOfSet);
             }
         }
-        pairSet.add(paramPair);
+        pairSet.add(pair);
     }
 
     /**
@@ -159,6 +244,9 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
 
         if (expr instanceof IntConstant) {
             return ((IntConstant) expr).value;
+//        }else if(expr instanceof JimpleLocal){
+//            JimpleLocal jimpleLocal= (JimpleLocal) expr;
+//            //Todo jimpleLocal
         } else if (expr instanceof Local) {
             Local local = (Local) expr;
             List<Integer> integerSet = getDataFlowValueFromUnitAndLocal(unit, local);
@@ -168,8 +256,9 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
             } else if (integerSet.size() == 1) {
                 return integerSet.get(0);
             } else {
+
                 System.out.println(integerSet);
-                return integerSet.get(integerSet.size() - 1);
+//                return integerSet.get(integerSet.size() - 1);
                 //throw new ParameterException("more than one DataflowFact for the local: " + local);
             }
         } else if (expr instanceof JAddExpr) {
@@ -191,11 +280,16 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
     }
 
     private Set<Pair<Local, Integer>> getDataFlowFactsFromUnit(Unit unit) {
-        return unitSetMap.get(unit);
+        Set<Pair<Local, Integer>> set = unitSetMap.get(unit);
+        if (set != null) {
+            return unitSetMap.get(unit);
+        }
+        return new HashSet<>();
     }
 
     /**
      * Size=0 => kein Dataflow fact existiert für das Local zu diesem Zeitpunkt, sonst size=1
+     *
      * @param unit
      * @param local
      * @return
