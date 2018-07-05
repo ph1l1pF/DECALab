@@ -103,7 +103,8 @@ public class Exercise1Test extends IFDSTestSetUp {
     public void SimpleAssignment5() {
         JimpleIFDSSolver<?, InterproceduralCFG<Unit, SootMethod>> analysis = executeStaticAnalysis(SimpleAssignment5.class.getName());
         List<Pair<String, Integer>> expected = new ArrayList<>();
-        expected.add(new Pair("i", 100));
+        //Removed because of disscution in koala
+        //expected.add(new Pair("i", 100));
         expected.add(new Pair("j", 200));
         expected.add(new Pair("i", 13));
         checkResultsAtLastStatement(analysis, expected);

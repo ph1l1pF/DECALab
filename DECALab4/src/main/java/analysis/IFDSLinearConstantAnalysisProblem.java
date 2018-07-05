@@ -107,8 +107,8 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
 
                         JAssignStmt jAssignStmt = null;
                         InvokeExpr invokeExpr = null;
-                        System.out.println(dest.getSignature());
-                        System.out.println(dest.getActiveBody());
+//                        System.out.println(dest.getSignature());
+//                        System.out.println(dest.getActiveBody());
 //                        System.out.println("Locals:" + dest.getActiveBody().getParameterLocals());
 //                        System.out.println("Values: "+ dest.getActiveBody().getParameterRefs());
 
@@ -129,9 +129,9 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
                                 addNewDataFlowFactToSet(returnSet, listMethodSite.get(i), result);
                             }
                         }
-                        if (dest.hasActiveBody()) {
-                            unitSetMap.put(dest.getActiveBody().getUnits().getFirst(), returnSet);
-                        }
+
+                        unitSetMap.put(dest.getActiveBody().getUnits().getFirst(), returnSet);
+
                         return returnSet;
                     }
                 };
@@ -149,11 +149,11 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
                 FlowFunction<Pair<Local, Integer>> flowFunction = new FlowFunction<Pair<Local, Integer>>() {
                     @Override
                     public Set<Pair<Local, Integer>> computeTargets(Pair<Local, Integer> localIntegerPair) {
-                        System.out.println("ReturnFlow");
-                        System.out.println(exit);
-                        System.out.println(exit.getClass());
-                        System.out.println(retsite);
-                        System.out.println(retsite.getClass());
+//                        System.out.println("ReturnFlow");
+//                        System.out.println(exit);
+//                        System.out.println(exit.getClass());
+//                        System.out.println(retsite);
+//                        System.out.println(retsite.getClass());
 
                         if (exit instanceof JReturnStmt) {
                             JReturnStmt jReturnStmt = (JReturnStmt) exit;
@@ -168,12 +168,22 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
                                 }
                             }
 
-                        }
+                        } else {
+                            System.out.println("Bad path");
 
+                        }
+                        System.out.println("Unit: " + retsite + " :" + returnSet);
                         Set<Pair<Local, Integer>> set = unitSetMap.get(retsite);
-                        set.addAll(returnSet);
+                        if (set == null) {
+                            set = new HashSet<>();
+                        }
+                        if (returnSet.size() == 0) {
+                            set.addAll(getDataFlowFactsFromUnit(exit));
+                        } else {
+                            set.addAll(returnSet);
+                        }
                         unitSetMap.put(retsite, set);
-                        return returnSet;
+                        return set;
                     }
                 };
                 return flowFunction;
@@ -196,8 +206,14 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
 //                        System.out.println(retsite);
 //                        System.out.println(retsite.getClass());
 
-                        unitSetMap.put(retsite, returnSet);
-                        return returnSet;
+                        Set<Pair<Local, Integer>> set = unitSetMap.get(retsite);
+                        if (set == null) {
+                            set = new HashSet<>();
+                        }
+                        set.addAll(returnSet);
+                        unitSetMap.put(retsite, set);
+                        //unitSetMap.put(retsite,returnSet);
+                        return set;
                     }
                 };
                 return flowFunction;
@@ -257,7 +273,7 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
                 return integerSet.get(0);
             } else {
 
-                System.out.println(integerSet);
+                System.out.println("Fail:" + integerSet);
 //                return integerSet.get(integerSet.size() - 1);
                 //throw new ParameterException("more than one DataflowFact for the local: " + local);
             }
@@ -295,7 +311,7 @@ public class IFDSLinearConstantAnalysisProblem extends DefaultJimpleIFDSTabulati
      * @return
      */
     private List<Integer> getDataFlowValueFromUnitAndLocal(Unit unit, Local local) {
-        System.out.println("Set: " + getDataFlowFactsFromUnit(unit));
+//        System.out.println("Set: " + getDataFlowFactsFromUnit(unit));
         Set<Pair<Local, Integer>> pairSet = getDataFlowFactsFromUnit(unit);
         List<Integer> integerSet = new ArrayList<>();
         for (Pair<Local, Integer> pair : pairSet) {
